@@ -8,8 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Void.Minecraft" Version="0.5.16" />
-      <PackageReference Include="Void.Proxy.Api" Version="0.5.16" />
+      <PackageReference Include="Void.Minecraft" Version="0.6.0" />
+      <PackageReference Include="Void.Proxy.Api" Version="0.6.0" />
       <PackageReference Include="Void.Data" Version="0.1.13" />
     </ItemGroup>
 
