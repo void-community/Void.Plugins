@@ -31,17 +31,17 @@ public class PositionService(IPlayerContext playerContext, IEventService eventSe
         or SetPlayerPositionAndRotationServerboundPacket)
     {
       var isFirstPosition = !HasPosition();
+      var prevPosition = position;
 
-      position = new Position();
-
-      var prevPosition = new Position
+      // Start from the previous values, packets only carry position or rotation
+      position = new Position
       {
-        X = position.X,
-        Y = position.Y,
-        Z = position.Z,
-        Yaw = position.Yaw,
-        Pitch = position.Pitch,
-        Flags = position.Flags
+        X = prevPosition?.X ?? 0,
+        Y = prevPosition?.Y ?? 0,
+        Z = prevPosition?.Z ?? 0,
+        Yaw = prevPosition?.Yaw ?? 0,
+        Pitch = prevPosition?.Pitch ?? 0,
+        Flags = prevPosition?.Flags ?? 0
       };
 
       switch (@event.Message)
@@ -63,7 +63,6 @@ public class PositionService(IPlayerContext playerContext, IEventService eventSe
           position.Z = positionAndRotationPacket.Z;
           position.Yaw = positionAndRotationPacket.Yaw;
           position.Pitch = positionAndRotationPacket.Pitch;
-          position.Flags = positionAndRotationPacket.Flags;
           position.Flags = positionAndRotationPacket.Flags;
           break;
       }

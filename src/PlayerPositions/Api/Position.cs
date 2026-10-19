@@ -11,11 +11,11 @@ public class Position
 
   public bool IsOnGround()
   {
-    return (Flags & 0x01) == 0;
+    return (Flags & 0x01) != 0;
   }
 
   public bool IsPushingAgainstWall()
   {
-    return (Flags & 0x02) == 0;
+    return (Flags & 0x02) != 0;
   }
 }

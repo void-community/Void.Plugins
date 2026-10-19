@@ -55,15 +55,22 @@ internal class TransformationService(
   private void RegisterPlayTransformations(INetworkChannel channel)
   {
     playerContext.Player.RegisterTransformations<SetPlayerPositionServerboundPacket>(channel, [
-      ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setPlayerPositionTransformation.DowngradeTo_1_7_2)
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_7_6, ProtocolVersion.MINECRAFT_1_8, setPlayerPositionTransformation.UpgradeTo_1_8),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, setPlayerPositionTransformation.UpgradeTo_1_21_2),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setPlayerPositionTransformation.DowngradeTo_1_21),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_8, ProtocolVersion.MINECRAFT_1_7_6, setPlayerPositionTransformation.DowngradeTo_1_7_6)
     ]);
 
     playerContext.Player.RegisterTransformations<SetPlayerRotationServerboundPacket>(channel, [
-      ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setPlayerRotationTransformation.DowngradeTo_1_7_2)
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, setPlayerRotationTransformation.UpgradeTo_1_21_2),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setPlayerRotationTransformation.DowngradeTo_1_21)
     ]);
 
     playerContext.Player.RegisterTransformations<SetPlayerPositionAndRotationServerboundPacket>(channel, [
-      ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setPlayerPositionAndRotationTransformation.DowngradeTo_1_7_2)
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_7_6, ProtocolVersion.MINECRAFT_1_8, setPlayerPositionAndRotationTransformation.UpgradeTo_1_8),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, setPlayerPositionAndRotationTransformation.UpgradeTo_1_21_2),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setPlayerPositionAndRotationTransformation.DowngradeTo_1_21),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_8, ProtocolVersion.MINECRAFT_1_7_6, setPlayerPositionAndRotationTransformation.DowngradeTo_1_7_6)
     ]);
 
     logger.LogInformation($"Registered play transformations for {PlayerExtensions.get_Profile(playerContext.Player)?.Username ?? "unknown"}");
