@@ -12,6 +12,14 @@ namespace BossBars.Protocol.Packets.Clientbound;
 internal class BossBarClientboundPacket : IMinecraftClientboundPacket<BossBarClientboundPacket>
 {
   public static readonly MinecraftPacketIdMapping[] Mappings = [
+    new(0x0C, ProtocolVersion.MINECRAFT_1_9),
+    new(0x0D, ProtocolVersion.MINECRAFT_1_15),
+    new(0x0C, ProtocolVersion.MINECRAFT_1_16),
+    new(0x0D, ProtocolVersion.MINECRAFT_1_17),
+    new(0x0A, ProtocolVersion.MINECRAFT_1_19),
+    new(0x0B, ProtocolVersion.MINECRAFT_1_19_4),
+    new(0x0A, ProtocolVersion.MINECRAFT_1_20_2),
+
     .. ProtocolVersion
       .Range(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.Latest)
       .Select(i => new MinecraftPacketIdMapping(
