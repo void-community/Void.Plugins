@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.7](https://github.com/void-community/Void.Plugins/compare/PlayerPositions-v0.0.6...PlayerPositions-v0.0.7) (2026-10-20)
+
+
+### Features
+
+* Bump Void.Data, Void.Minecraft and Void.Proxy.Api ([fdb404f](https://github.com/void-community/Void.Plugins/commit/fdb404fe2b773e1a7a83b538c32f7d12e89d643f))
+
+
+### Bug Fixes
+
+* **player-positions:** map movement packets for 1.7.2 to latest ([#68](https://github.com/void-community/Void.Plugins/issues/68)) ([c4c1514](https://github.com/void-community/Void.Plugins/commit/c4c1514821accc281d19732869f2fb75d6f29515))
+
 ## [0.0.6](https://github.com/Shonz1/Void.Plugins/compare/PlayerPositions-v0.0.5...PlayerPositions-v0.0.6) (2026-05-13)
 
 
