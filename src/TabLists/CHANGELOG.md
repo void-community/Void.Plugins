@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.11](https://github.com/void-community/Void.Plugins/compare/TabLists-v0.0.10...TabLists-v0.0.11) (2026-10-20)
+
+
+### Features
+
+* Bump Void.Data, Void.Minecraft and Void.Proxy.Api ([fdb404f](https://github.com/void-community/Void.Plugins/commit/fdb404fe2b773e1a7a83b538c32f7d12e89d643f))
+
+
+### Bug Fixes
+
+* packet ids and transformations in TabLists, Menus and BossBars ([#69](https://github.com/void-community/Void.Plugins/issues/69)) ([799d23f](https://github.com/void-community/Void.Plugins/commit/799d23fd056ca246f1a984347b1e8eba5ed2859c))
+* **player-positions:** map movement packets for 1.7.2 to latest ([#68](https://github.com/void-community/Void.Plugins/issues/68)) ([c4c1514](https://github.com/void-community/Void.Plugins/commit/c4c1514821accc281d19732869f2fb75d6f29515))
+
 ## [0.0.10](https://github.com/Shonz1/Void.Plugins/compare/TabLists-v0.0.9...TabLists-v0.0.10) (2026-05-13)
 
 
