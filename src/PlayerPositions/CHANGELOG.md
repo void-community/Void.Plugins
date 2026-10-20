@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8](https://github.com/void-community/Void.Plugins/compare/PlayerPositions-v0.0.7...PlayerPositions-v0.0.8) (2026-10-20)
+
+
+### Bug Fixes
+
+* **player-positions:** pass yaw and pitch through as FloatProperty ([be913a8](https://github.com/void-community/Void.Plugins/commit/be913a81ad90fa6f7591b1ec5be1fe9a9cbc0c1d))
+
 ## [0.0.7](https://github.com/void-community/Void.Plugins/compare/PlayerPositions-v0.0.6...PlayerPositions-v0.0.7) (2026-10-20)
 
 
