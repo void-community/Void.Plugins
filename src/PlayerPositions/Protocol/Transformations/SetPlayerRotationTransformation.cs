@@ -12,8 +12,8 @@ public class SetPlayerRotationTransformation(ILogger<SetPlayerRotationTransforma
   {
     logger.LogTrace($"Upgrade to 1.21.2 {fromProtocolVersion} -> {toProtocolVersion}");
 
-    wrapper.Passthrough<IntProperty>(); // Yaw as raw bits, FloatProperty can't be read in Void 0.6.0
-    wrapper.Passthrough<IntProperty>(); // Pitch
+    wrapper.Passthrough<FloatProperty>(); // Yaw
+    wrapper.Passthrough<FloatProperty>(); // Pitch
 
     var onGround = wrapper.Read<BoolProperty>();
     wrapper.Write(ByteProperty.FromPrimitive((byte) (onGround.AsPrimitive ? 0x01 : 0x00))); // Flags
@@ -24,8 +24,8 @@ public class SetPlayerRotationTransformation(ILogger<SetPlayerRotationTransforma
   {
     logger.LogTrace($"Downgrade to 1.21 {fromProtocolVersion} -> {toProtocolVersion}");
 
-    wrapper.Passthrough<IntProperty>(); // Yaw as raw bits, FloatProperty can't be read in Void 0.6.0
-    wrapper.Passthrough<IntProperty>(); // Pitch
+    wrapper.Passthrough<FloatProperty>(); // Yaw
+    wrapper.Passthrough<FloatProperty>(); // Pitch
 
     var flags = wrapper.Read<ByteProperty>();
     wrapper.Write(BoolProperty.FromPrimitive((flags.AsPrimitive & 0x01) != 0)); // On ground

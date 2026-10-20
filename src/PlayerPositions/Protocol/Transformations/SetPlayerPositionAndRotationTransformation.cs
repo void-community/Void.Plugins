@@ -16,8 +16,8 @@ public class SetPlayerPositionAndRotationTransformation(ILogger<SetPlayerPositio
     wrapper.Passthrough<DoubleProperty>(); // Feet Y
     wrapper.Read<DoubleProperty>(); // Head Y
     wrapper.Passthrough<DoubleProperty>(); // Z
-    wrapper.Passthrough<IntProperty>(); // Yaw as raw bits, FloatProperty can't be read in Void 0.6.0
-    wrapper.Passthrough<IntProperty>(); // Pitch
+    wrapper.Passthrough<FloatProperty>(); // Yaw
+    wrapper.Passthrough<FloatProperty>(); // Pitch
     wrapper.Passthrough<BoolProperty>(); // On ground
   }
 
@@ -29,8 +29,8 @@ public class SetPlayerPositionAndRotationTransformation(ILogger<SetPlayerPositio
     wrapper.Passthrough<DoubleProperty>(); // X
     wrapper.Passthrough<DoubleProperty>(); // Y
     wrapper.Passthrough<DoubleProperty>(); // Z
-    wrapper.Passthrough<IntProperty>(); // Yaw as raw bits, FloatProperty can't be read in Void 0.6.0
-    wrapper.Passthrough<IntProperty>(); // Pitch
+    wrapper.Passthrough<FloatProperty>(); // Yaw
+    wrapper.Passthrough<FloatProperty>(); // Pitch
 
     var onGround = wrapper.Read<BoolProperty>();
     wrapper.Write(ByteProperty.FromPrimitive((byte) (onGround.AsPrimitive ? 0x01 : 0x00))); // Flags
@@ -44,8 +44,8 @@ public class SetPlayerPositionAndRotationTransformation(ILogger<SetPlayerPositio
     wrapper.Passthrough<DoubleProperty>(); // X
     wrapper.Passthrough<DoubleProperty>(); // Y
     wrapper.Passthrough<DoubleProperty>(); // Z
-    wrapper.Passthrough<IntProperty>(); // Yaw as raw bits, FloatProperty can't be read in Void 0.6.0
-    wrapper.Passthrough<IntProperty>(); // Pitch
+    wrapper.Passthrough<FloatProperty>(); // Yaw
+    wrapper.Passthrough<FloatProperty>(); // Pitch
 
     var flags = wrapper.Read<ByteProperty>();
     wrapper.Write(BoolProperty.FromPrimitive((flags.AsPrimitive & 0x01) != 0)); // On ground
@@ -63,8 +63,8 @@ public class SetPlayerPositionAndRotationTransformation(ILogger<SetPlayerPositio
     wrapper.Write(DoubleProperty.FromPrimitive(y.AsPrimitive + 1.62)); // Head Y
 
     wrapper.Passthrough<DoubleProperty>(); // Z
-    wrapper.Passthrough<IntProperty>(); // Yaw as raw bits, FloatProperty can't be read in Void 0.6.0
-    wrapper.Passthrough<IntProperty>(); // Pitch
+    wrapper.Passthrough<FloatProperty>(); // Yaw
+    wrapper.Passthrough<FloatProperty>(); // Pitch
     wrapper.Passthrough<BoolProperty>(); // On ground
   }
 }
