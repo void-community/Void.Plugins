@@ -89,6 +89,21 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
 
     logger.LogTrace($"Downgrade to 1.21.2 {fromProtocolVersion} -> {toProtocolVersion}");
 
+    wrapper.Passthrough<VarIntProperty>(); // Container id
+    wrapper.Passthrough<VarIntProperty>(); // State id
+    wrapper.Passthrough<ShortProperty>(); // Slot id
+
+    itemStackTransformation.Downgrade(wrapper, fromProtocolVersion, toProtocolVersion);
+  }
+
+  public void DowngradeTo_1_21(IMinecraftBinaryPacketWrapper wrapper,
+    ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
+  {
+    if (fromProtocolVersion < toProtocolVersion)
+      return;
+
+    logger.LogTrace($"Downgrade to 1.21 {fromProtocolVersion} -> {toProtocolVersion}");
+
     var containerId = wrapper.Read<VarIntProperty>();
     wrapper.Write(ByteProperty.FromPrimitive((byte)containerId.AsPrimitive));
 
