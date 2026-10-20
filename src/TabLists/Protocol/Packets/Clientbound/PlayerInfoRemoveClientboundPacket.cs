@@ -11,7 +11,7 @@ namespace TabLists.Protocol.Packets.Clientbound;
 public class PlayerInfoRemoveClientboundPacket : IMinecraftClientboundPacket<PlayerInfoRemoveClientboundPacket>
 {
   public static readonly MinecraftPacketIdMapping[] Mappings = [
-    new(0x34, ProtocolVersion.MINECRAFT_1_19_3),
+    new(0x35, ProtocolVersion.MINECRAFT_1_19_3),
     new(0x39, ProtocolVersion.MINECRAFT_1_19_4),
     new(0x3B, ProtocolVersion.MINECRAFT_1_20_2),
     new(0x3D, ProtocolVersion.MINECRAFT_1_20_5),
