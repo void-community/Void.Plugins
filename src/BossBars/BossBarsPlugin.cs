@@ -1,4 +1,5 @@
-﻿using BossBars.Services;
+﻿using BossBars.Protocol.Transformations;
+using BossBars.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Void.Proxy.Api.Events;
 using Void.Proxy.Api.Events.Plugins;
@@ -19,7 +20,10 @@ public class BossBarsPlugin(IDependencyService dependencyService) : IApiPlugin
 
     dependencyService.Register(services =>
     {
+      services.AddSingleton<BossBarTransformation>();
+
       services.AddScoped<PacketService>();
+      services.AddScoped<TransformationService>();
       services.AddScoped<BossBarService>();
     });
   }

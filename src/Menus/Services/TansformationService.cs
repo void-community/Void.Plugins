@@ -62,7 +62,8 @@ internal class TransformationService(
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_17_1, ProtocolVersion.MINECRAFT_1_17, setContainerSlotTransformation.DowngradeTo_1_17),
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_20_3, ProtocolVersion.MINECRAFT_1_17_1, setContainerSlotTransformation.Passthrough_1_17_1_plus),
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_20_5, ProtocolVersion.MINECRAFT_1_20_3, setContainerSlotTransformation.DowngradeTo_1_20_3),
-      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_20_5, setContainerSlotTransformation.Passthrough_1_20_5_plus),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_20_5, setContainerSlotTransformation.Passthrough_1_20_5_plus),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setContainerSlotTransformation.DowngradeTo_1_21),
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_4, ProtocolVersion.MINECRAFT_1_21_2, setContainerSlotTransformation.DowngradeTo_1_21_2),
       ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setContainerSlotTransformation.Passthrough_1_21_4_plus),
     ]);

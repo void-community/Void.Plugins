@@ -58,7 +58,7 @@ public class TabListsPlugin(IDependencyService dependencyService) : IApiPlugin
         @event.Cancel();
 
         var position = binaryPacket.Stream.Position;
-        binaryPacket.Stream.Position = binaryPacket.Stream.Length - 2;
+        binaryPacket.Stream.Position = binaryPacket.Stream.Length - 1; // Enforces secure chat
         binaryPacket.Stream.WriteByte(1);
         binaryPacket.Stream.Position = position;
 
