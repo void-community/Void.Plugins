@@ -41,6 +41,9 @@ internal class PacketService(ILogger<PacketService> logger, IPlayerContext playe
 
     playerContext.Player.RegisterPacket<ClickContainerServerboundPacket>(channel, Operation.Write, ClickContainerServerboundPacket.Mappings);
 
+    if (playerContext.Player.ProtocolVersion >= ProtocolVersion.MINECRAFT_1_21_2)
+      playerContext.Player.RegisterPacket<SetPlayerInventorySlotClientboundPacket>(channel, Operation.Read, SetPlayerInventorySlotClientboundPacket.Mappings);
+
     logger.LogInformation($"Registered play packets to server for {playerContext.Player}");
   }
 
@@ -55,6 +58,12 @@ internal class PacketService(ILogger<PacketService> logger, IPlayerContext playe
     playerContext.Player.RegisterPacket<CloseContainerServerboundPacket>(channel, Operation.Read, CloseContainerServerboundPacket.Mappings);
 
     playerContext.Player.RegisterPacket<ClickContainerServerboundPacket>(channel, Operation.Read, ClickContainerServerboundPacket.Mappings);
+    playerContext.Player.RegisterPacket<SetCreativeModeSlotServerboundPacket>(channel, Operation.Read, SetCreativeModeSlotServerboundPacket.Mappings);
+    playerContext.Player.RegisterPacket<PlayerActionServerboundPacket>(channel, Operation.Read, PlayerActionServerboundPacket.Mappings);
+    playerContext.Player.RegisterPacket<UseItemOnServerboundPacket>(channel, Operation.Read, UseItemOnServerboundPacket.Mappings);
+
+    if (playerContext.Player.ProtocolVersion >= ProtocolVersion.MINECRAFT_1_9)
+      playerContext.Player.RegisterPacket<UseItemServerboundPacket>(channel, Operation.Read, UseItemServerboundPacket.Mappings);
 
     logger.LogInformation($"Registered play packets to client for {playerContext.Player}");
   }

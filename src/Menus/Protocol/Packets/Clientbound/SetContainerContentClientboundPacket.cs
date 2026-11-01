@@ -36,9 +36,14 @@ public class SetContainerContentClientboundPacket : IMinecraftClientboundPacket<
   public List<ItemStack?> ItemStacks { get; set; } = [];
   public ItemStack? CarriedItemStack { get; set; }
 
+  // Only the container id is decoded to tell backend inventory updates apart, the original packet is forwarded as is.
+  // No upgrade transformations are registered, so the container id keeps the backend layout.
   public static SetContainerContentClientboundPacket Decode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
-    return new SetContainerContentClientboundPacket();
+    return new SetContainerContentClientboundPacket
+    {
+      ContainerId = protocolVersion >= ProtocolVersion.MINECRAFT_1_21_2 ? buffer.ReadVarInt() : (sbyte) buffer.ReadUnsignedByte()
+    };
   }
 
   public void Encode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
