@@ -19,6 +19,7 @@ public class MenusPlugin(IDependencyService dependencyService) : IApiPlugin
     {
       services.AddSingleton<ItemStackTransformation>();
       services.AddSingleton<SetContainerSlotTransformation>();
+      services.AddSingleton<SetContainerContentTransformation>();
       services.AddSingleton<SetContainerPropertyTransformation>();
       services.AddSingleton<OpenContainerTransformation>();
       services.AddSingleton<CloseContainerTransformation>();

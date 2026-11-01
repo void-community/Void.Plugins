@@ -31,13 +31,19 @@ public class CloseContainerServerboundPacket : IMinecraftServerboundPacket<Close
         MinecraftPacketRegistry.GetId(i, Phase.Play, Direction.Serverbound, "minecraft:container_close"), i))
   ];
 
+  public int ContainerId { get; set; }
+
   public static CloseContainerServerboundPacket Decode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
-    return new CloseContainerServerboundPacket();
+    return new CloseContainerServerboundPacket
+    {
+      ContainerId = buffer.ReadVarInt()
+    };
   }
 
   public void Encode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
+    buffer.WriteVarInt(ContainerId);
   }
 
   public void Dispose()
