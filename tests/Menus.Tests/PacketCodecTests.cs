@@ -136,6 +136,19 @@ public class PacketCodecTests
   }
 
   [Theory]
+  [InlineData(new byte[] { 0x00 }, 340, 0)] // 1.12.2 signed byte
+  [InlineData(new byte[] { 0x05 }, 767, 5)]
+  [InlineData(new byte[] { 0x00 }, 774, 0)] // VarInt
+  public void PlaceRecipeDecodesContainerId(byte[] bytes, int protocol, int containerId)
+  {
+    var buffer = new MinecraftBuffer(bytes.AsSpan());
+
+    var packet = PlaceRecipeServerboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
+
+    Assert.Equal(containerId, packet.ContainerId);
+  }
+
+  [Theory]
   [InlineData(new byte[] { 0x04 }, 47, 4)] // 1.8 byte
   [InlineData(new byte[] { 0x06 }, 774, 6)] // VarInt
   public void PlayerActionDecodesStatus(byte[] bytes, int protocol, int status)

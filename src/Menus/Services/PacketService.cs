@@ -65,6 +65,19 @@ internal class PacketService(ILogger<PacketService> logger, IPlayerContext playe
     if (playerContext.Player.ProtocolVersion >= ProtocolVersion.MINECRAFT_1_9)
       playerContext.Player.RegisterPacket<UseItemServerboundPacket>(channel, Operation.Read, UseItemServerboundPacket.Mappings);
 
+    if (playerContext.Player.ProtocolVersion >= ProtocolVersion.MINECRAFT_1_12_1)
+      playerContext.Player.RegisterPacket<PlaceRecipeServerboundPacket>(channel, Operation.Read, PlaceRecipeServerboundPacket.Mappings);
+
+    if (playerContext.Player.ProtocolVersion >= ProtocolVersion.MINECRAFT_1_21_4)
+    {
+      playerContext.Player.RegisterPacket<PickItemFromBlockServerboundPacket>(channel, Operation.Read, PickItemFromBlockServerboundPacket.Mappings);
+      playerContext.Player.RegisterPacket<PickItemFromEntityServerboundPacket>(channel, Operation.Read, PickItemFromEntityServerboundPacket.Mappings);
+    }
+    else if (playerContext.Player.ProtocolVersion >= ProtocolVersion.MINECRAFT_1_13)
+    {
+      playerContext.Player.RegisterPacket<PickItemServerboundPacket>(channel, Operation.Read, PickItemServerboundPacket.Mappings);
+    }
+
     logger.LogInformation("Registered play packets to client for {Player}", playerContext.Player);
   }
 }
