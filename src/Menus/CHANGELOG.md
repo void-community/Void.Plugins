@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/void-community/Void.Plugins/compare/Menus-v0.1.0...Menus-v0.1.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **menus:** guard the delayed backend inventory resync ([#78](https://github.com/void-community/Void.Plugins/issues/78)) ([150724a](https://github.com/void-community/Void.Plugins/commit/150724a39e422fb4201775b795e251f8605a80f8))
+
 ## [0.1.0](https://github.com/void-community/Void.Plugins/compare/Menus-v0.0.7...Menus-v0.1.0) (2026-11-01)
 
 
