@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.0](https://github.com/void-community/Void.Plugins/compare/Menus-v0.0.7...Menus-v0.1.0) (2026-11-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **menus:** MenuService.CurrentMenu is now a read-only property instead of a public field.
+* **menus:** MenuService.InventoryMenu is now a read-only property instead of a public field. Use SetInventoryMenuAsync to set it.
+
+### Features
+
+* **menus:** add click callbacks, menu events and item updates ([#75](https://github.com/void-community/Void.Plugins/issues/75)) ([391ba17](https://github.com/void-community/Void.Plugins/commit/391ba17d99a8ad5bd22bb6f9f756e0e9f9f55d0a))
+
+
+### Bug Fixes
+
+* **menus:** let menus own the player inventory per player ([#74](https://github.com/void-community/Void.Plugins/issues/74)) ([e0fef83](https://github.com/void-community/Void.Plugins/commit/e0fef8387227d77efd851ec41df062515e8e2460))
+* **menus:** limit backend resyncs and block pick item while owning the inventory ([#77](https://github.com/void-community/Void.Plugins/issues/77)) ([e8d9847](https://github.com/void-community/Void.Plugins/commit/e8d984767ac923f962cee1299b6a64c9e0b0ec22))
+* **menus:** undo client click prediction and send menus as container content ([#72](https://github.com/void-community/Void.Plugins/issues/72)) ([76ca0df](https://github.com/void-community/Void.Plugins/commit/76ca0df68201d2fbb09eac53049be0e56eb08f56))
+
 ## [0.0.7](https://github.com/void-community/Void.Plugins/compare/Menus-v0.0.6...Menus-v0.0.7) (2026-10-20)
 
 
