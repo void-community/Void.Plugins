@@ -32,6 +32,7 @@ internal class PacketService(ILogger<PacketService> logger, IPlayerContext playe
   private void RegisterPlayForServerPackets(INetworkChannel channel)
   {
     playerContext.Player.RegisterPacket<SetContainerSlotClientboundPacket>(channel, Operation.Read, SetContainerSlotClientboundPacket.Mappings);
+    playerContext.Player.RegisterPacket<SetContainerContentClientboundPacket>(channel, Operation.Read, SetContainerContentClientboundPacket.Mappings);
     playerContext.Player.RegisterPacket<SetContainerPropertyClientboundPacket>(channel, Operation.Read, SetContainerPropertyClientboundPacket.Mappings);
 
     playerContext.Player.RegisterPacket<OpenContainerClientboundPacket>(channel, Operation.Read, OpenContainerClientboundPacket.Mappings);
@@ -46,6 +47,7 @@ internal class PacketService(ILogger<PacketService> logger, IPlayerContext playe
   private void RegisterPlayForClientPackets(INetworkChannel channel)
   {
     playerContext.Player.RegisterPacket<SetContainerSlotClientboundPacket>(channel, Operation.Write, SetContainerSlotClientboundPacket.Mappings);
+    playerContext.Player.RegisterPacket<SetContainerContentClientboundPacket>(channel, Operation.Write, SetContainerContentClientboundPacket.Mappings);
     playerContext.Player.RegisterPacket<SetContainerPropertyClientboundPacket>(channel, Operation.Write, SetContainerPropertyClientboundPacket.Mappings);
 
     playerContext.Player.RegisterPacket<OpenContainerClientboundPacket>(channel, Operation.Write, OpenContainerClientboundPacket.Mappings);

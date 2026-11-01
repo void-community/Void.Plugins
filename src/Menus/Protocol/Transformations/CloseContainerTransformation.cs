@@ -15,4 +15,13 @@ public class CloseContainerTransformation(ILogger<CloseContainerTransformation> 
     var containerId = wrapper.Read<VarIntProperty>();
     wrapper.Write(ByteProperty.FromPrimitive((byte) containerId.AsPrimitive));
   }
+
+  public void UpgradeTo_1_21_2(IMinecraftBinaryPacketWrapper wrapper,
+    ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
+  {
+    logger.LogTrace($"Upgrade to 1.21.2 {fromProtocolVersion} -> {toProtocolVersion}");
+
+    var containerId = wrapper.Read<ByteProperty>();
+    wrapper.Write(VarIntProperty.FromPrimitive(containerId.AsPrimitive));
+  }
 }

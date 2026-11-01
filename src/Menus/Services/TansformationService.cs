@@ -18,6 +18,7 @@ internal class TransformationService(
   ILogger<TransformationService> logger,
   IPlayerContext playerContext,
   SetContainerSlotTransformation setContainerSlotTransformation,
+  SetContainerContentTransformation setContainerContentTransformation,
   SetContainerPropertyTransformation setContainerPropertyTransformation,
   OpenContainerTransformation openContainerTransformation,
   CloseContainerTransformation closeContainerTransformation,
@@ -68,6 +69,17 @@ internal class TransformationService(
       ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setContainerSlotTransformation.Passthrough_1_21_4_plus),
     ]);
 
+    playerContext.Player.RegisterTransformations<SetContainerContentClientboundPacket>(channel, [
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_17, ProtocolVersion.MINECRAFT_1_7_2, setContainerContentTransformation.Passthrough_1_7_2_plus),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_17_1, ProtocolVersion.MINECRAFT_1_17, setContainerContentTransformation.DowngradeTo_1_17),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_20_3, ProtocolVersion.MINECRAFT_1_17_1, setContainerContentTransformation.Passthrough_1_17_1_plus),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_20_5, ProtocolVersion.MINECRAFT_1_20_3, setContainerContentTransformation.DowngradeTo_1_20_3),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_20_5, setContainerContentTransformation.Passthrough_1_20_5_plus),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setContainerContentTransformation.DowngradeTo_1_21),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_4, ProtocolVersion.MINECRAFT_1_21_2, setContainerContentTransformation.DowngradeTo_1_21_2),
+      ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setContainerContentTransformation.Passthrough_1_21_4_plus),
+    ]);
+
     playerContext.Player.RegisterTransformations<SetContainerPropertyClientboundPacket>(channel, [
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setContainerPropertyTransformation.DowngradeTo_1_21)
     ]);
@@ -84,6 +96,10 @@ internal class TransformationService(
 
     playerContext.Player.RegisterTransformations<CloseContainerClientboundPacket>(channel, [
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, closeContainerTransformation.DowngradeTo_1_21)
+    ]);
+
+    playerContext.Player.RegisterTransformations<CloseContainerServerboundPacket>(channel, [
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, closeContainerTransformation.UpgradeTo_1_21_2)
     ]);
 
     playerContext.Player.RegisterTransformations<ClickContainerServerboundPacket>(channel, [
