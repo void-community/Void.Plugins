@@ -41,10 +41,10 @@ public class SetHeldItemClientboundPacket : IMinecraftClientboundPacket<SetHeldI
 
   public static SetHeldItemClientboundPacket Decode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
-    // Hotbar slots are written the same way as a byte and as a VarInt
+    // Upgrade transformations bring older layouts to the latest one
     return new SetHeldItemClientboundPacket
     {
-      Slot = protocolVersion >= ProtocolVersion.MINECRAFT_1_21_4 ? buffer.ReadVarInt() : buffer.ReadUnsignedByte()
+      Slot = buffer.ReadVarInt()
     };
   }
 
