@@ -38,11 +38,23 @@ jobs:
     outputs:
       info: ${{ toJSON(steps.release.outputs) }}
     steps:
+      # Pull requests and commits made with GITHUB_TOKEN wait for approval before their checks run,
+      # so release pull requests couldn't pass the required checks
+      - name: Create GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_PLEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
       - name: Create Release
         id: release
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: .github/RELEASE_PLEASE/config.json
           manifest-file: .github/RELEASE_PLEASE/manifest.json
 
