@@ -10,6 +10,60 @@ jobs:
     with:
       release-please: false
 
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.changed.outputs.matrix }}
+      any: ${{ steps.changed.outputs.any }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find changed plugins with tests
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed_files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          # Changing this workflow runs every test project, so the test job itself gets exercised
+          run_all=false
+          if grep -qx '.github/workflows/policy.yml' <<< "$changed_files"; then run_all=true; fi
+          matrix=$(jq -c --arg files "$changed_files" --argjson all "$run_all" '
+            [.plugins[] | select(.tests != null) | . as $plugin
+              | select($all or ($files | split("\n") | any(startswith($plugin.path + "/") or startswith($plugin.tests + "/"))))]
+          ' .github/plugin-manifest.json)
+          echo "Plugins to test: $matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "$matrix" != "[]" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: [semver, changes]
+    if: ${{ needs.changes.outputs.any == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ needs.semver.outputs.dotnet-version }}
+          cache: true
+          cache-dependency-path: |
+            src/**/*.csproj
+            tests/**/*.csproj
+
+      - name: Test ${{ matrix.component }}
+        run: dotnet test ${{ matrix.tests }} --configuration Release
+
   build:
     needs: semver
     uses: ./.github/workflows/dotnet.yml

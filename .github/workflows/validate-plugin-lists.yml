@@ -24,4 +24,7 @@ jobs:
             || { echo "::error::plugin-manifest.json vs RELEASE_PLEASE/config.json drift"; exit 1; }
           diff <(echo "$manifest_paths") <(echo "$rp_manifest_paths") \
             || { echo "::error::plugin-manifest.json vs RELEASE_PLEASE/manifest.json drift"; exit 1; }
+          for tests in $(jq -r '.plugins[] | select(.tests != null) | .tests' .github/plugin-manifest.json); do
+            [ -d "$tests" ] || { echo "::error::test project $tests listed in plugin-manifest.json does not exist"; exit 1; }
+          done
           echo "Plugin lists are consistent."
