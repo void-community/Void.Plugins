@@ -5,6 +5,7 @@ using Menus.Protocol.Packets.Clientbound;
 using Menus.Protocol.Packets.Serverbound;
 using Microsoft.Extensions.Logging;
 using Void.Data.Api.Minecraft;
+using Void.Minecraft.Events;
 using Void.Minecraft.Links.Extensions;
 using Void.Minecraft.Network;
 using Void.Minecraft.Players.Extensions;
@@ -12,6 +13,7 @@ using Void.Proxy.Api.Commands;
 using Void.Proxy.Api.Events;
 using Void.Proxy.Api.Events.Network;
 using Void.Proxy.Api.Links;
+using Void.Proxy.Api.Network;
 using Void.Proxy.Api.Players.Contexts;
 
 namespace Menus.Services;
@@ -23,13 +25,50 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   private const int MenuContainerId = 127;
   private const int PlayerInventoryContainerId = 0;
   private const int CursorContainerId = -1;
+  // Used by vanilla 1.17.1 to 1.21.1 backends to set player inventory slots regardless of the open container
+  private const int PlayerInventoryDirectContainerId = -2;
   private const int CursorSlot = -1;
   private const int OutsideSlot = -999;
 
   private static Menu? defaultInventoryMenu;
 
-  public Menu? InventoryMenu = defaultInventoryMenu;
+  private Menu? ownedInventoryMenu;
+
+  // The backend sent the player inventory since joining, so the client is ready for inventory packets
+  private bool inventoryInitialized;
+
+  // Backend containers show the real player inventory below them
+  private bool backendContainerOpen;
+
+  public Menu? InventoryMenu => ownedInventoryMenu ?? defaultInventoryMenu;
   public Menu? CurrentMenu;
+
+  /// <summary>
+  /// Shows <paramref name="menu"/> as the player inventory. While it is set, the proxy owns the player inventory:
+  /// backend inventory updates and the player's own inventory changes are blocked, and the menu is shown again after
+  /// backend containers close. Pass <c>null</c> to hand the inventory back to the backend.
+  /// Can be called before the player joins a server, for example on <c>PlayerJoinedServerEvent</c>: the menu is then
+  /// shown once the backend sends the player inventory.
+  /// </summary>
+  public async ValueTask SetInventoryMenuAsync(Menu? menu, CancellationToken cancellationToken)
+  {
+    var wasOwned = ownedInventoryMenu is not null;
+    ownedInventoryMenu = menu;
+
+    // Otherwise the backend sending the player inventory or closing its container shows the menu
+    if (menu is not null)
+    {
+      if (inventoryInitialized && !backendContainerOpen)
+        await RestoreInventoryMenuAsync(menu, cancellationToken);
+
+      return;
+    }
+
+    // Right after joining, the backend sends the real inventory anyway.
+    // Backends older than 1.17.1 show the real items again on their next inventory update, for example on server switch.
+    if (wasOwned && inventoryInitialized)
+      await RequestBackendResyncAsync(cancellationToken);
+  }
 
   public async ValueTask OpenAsync(Menu menu, CancellationToken cancellationToken)
   {
@@ -45,6 +84,8 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
       // This keeps the backend on the player inventory, which ResyncAsync relies on.
       if (linkService.TryGetLink(player, out var link))
         await link.SendPacketAsync(new CloseContainerServerboundPacket { ContainerId = PlayerInventoryContainerId }, cancellationToken);
+
+      backendContainerOpen = false;
 
       logger.LogTrace($"Opening menu {menu.Name} for {PlayerExtensions.get_Profile(playerContext.Player)?.Username ?? "unknown"}");
       var openContainerPacket = new OpenContainerClientboundPacket
@@ -123,8 +164,10 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   public async ValueTask ClickSlotAsync(Menu menu, int slot, ClickType clickType, CancellationToken cancellationToken)
   {
     MenuItem? item = null;
+    var isPlayerInventory = menu.Type == "minecraft:inventory";
 
-    if (slot >= menu.Size)
+    // Slots past a container menu belong to the player inventory below it
+    if (!isPlayerInventory && slot >= menu.Size)
     {
       if (InventoryMenu is not null)
       {
@@ -179,6 +222,22 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
       await SendContentAsync(PlayerInventoryContainerId, InventoryMenu, GetInventoryMenuSize(InventoryMenu), cancellationToken);
       return;
     }
+
+    await RequestBackendResyncAsync(cancellationToken);
+  }
+
+  private async ValueTask RestoreInventoryMenuAsync(Menu inventoryMenu, CancellationToken cancellationToken)
+  {
+    // Clears the cursor on 1.17.1+
+    await SendContentAsync(PlayerInventoryContainerId, inventoryMenu, GetInventoryMenuSize(inventoryMenu), cancellationToken);
+
+    // Older clients have no cursor item in container content
+    await playerContext.Player.SendPacketAsync(new SetContainerSlotClientboundPacket { ContainerId = CursorContainerId, Slot = CursorSlot }, cancellationToken);
+  }
+
+  private async ValueTask RequestBackendResyncAsync(CancellationToken cancellationToken)
+  {
+    var player = playerContext.Player;
 
     // Older backends don't resync on a stale state id, and the click below has no downgrade transformations
     if (player.ProtocolVersion < ProtocolVersion.MINECRAFT_1_17_1)
@@ -237,8 +296,36 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   }
 
   [Subscribe]
+  private void OnPhaseChanged(PhaseChangedEvent @event)
+  {
+    if (@event.Side is not Side.Server)
+      return;
+
+    // Joining a server starts with a fresh client inventory and no containers open
+    inventoryInitialized = false;
+    backendContainerOpen = false;
+  }
+
+  [Subscribe]
   private async ValueTask OnMessageReceived(MessageReceivedEvent @event, CancellationToken cancellationToken)
   {
+    switch (@event.Message)
+    {
+      case SetContainerContentClientboundPacket { ContainerId: PlayerInventoryContainerId }:
+        inventoryInitialized = true;
+        break;
+      case OpenContainerClientboundPacket:
+        backendContainerOpen = true;
+        break;
+      case CloseContainerServerboundPacket { ContainerId: not (PlayerInventoryContainerId or MenuContainerId) }:
+      case CloseContainerClientboundPacket:
+        backendContainerOpen = false;
+        break;
+    }
+
+    if (ownedInventoryMenu is { } inventoryMenu && await HandleOwnedInventoryAsync(@event, inventoryMenu, cancellationToken))
+      return;
+
     if (@event.Message is CloseContainerServerboundPacket { ContainerId: MenuContainerId })
     {
       // The backend never saw this container, and vanilla closes whatever is open regardless of the id
@@ -277,6 +364,63 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     }
   }
 
+  // Keeps the backend and the player from changing the player inventory while the proxy owns it
+  private async ValueTask<bool> HandleOwnedInventoryAsync(MessageReceivedEvent @event, Menu inventoryMenu, CancellationToken cancellationToken)
+  {
+    switch (@event.Message)
+    {
+      // While a backend container is open these update the real items shown below it, the menu is shown again once it closes
+      case SetContainerSlotClientboundPacket { ContainerId: PlayerInventoryContainerId or PlayerInventoryDirectContainerId } when !backendContainerOpen:
+      case SetPlayerInventorySlotClientboundPacket when !backendContainerOpen:
+        @event.Cancel();
+        return true;
+
+      // Sent on join, respawn and world change, when the client may have reset its inventory
+      case SetContainerContentClientboundPacket { ContainerId: PlayerInventoryContainerId } when !backendContainerOpen:
+        @event.Cancel();
+        await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
+        return true;
+
+      // The client consumes or moves the used item itself, placing a block or throwing a snowball for example.
+      // The backend may need the packet, so it is only observed.
+      case UseItemOnServerboundPacket:
+      case UseItemServerboundPacket:
+        await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
+        return true;
+
+      case ClickContainerServerboundPacket { ContainerId: PlayerInventoryContainerId } clickPacket:
+        @event.Cancel();
+
+        // Dragging sends a packet per slot, the client only applies it once the drag ends
+        if (clickPacket.Mode == 5 && clickPacket.Button is not (2 or 6 or 10))
+          return true;
+
+        await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
+
+        if (clickPacket.Mode == 0)
+          await ClickSlotAsync(inventoryMenu, clickPacket.Slot, (ClickType) clickPacket.Button, cancellationToken);
+
+        return true;
+
+      case SetCreativeModeSlotServerboundPacket:
+      case PlayerActionServerboundPacket { Status: PlayerActionServerboundPacket.DropItemStackStatus or PlayerActionServerboundPacket.DropItemStatus or PlayerActionServerboundPacket.SwapItemInHandStatus }:
+        @event.Cancel();
+        await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
+        return true;
+
+      // Backend containers show the real player inventory below them, so show the menu again once they close
+      case CloseContainerServerboundPacket { ContainerId: not (PlayerInventoryContainerId or MenuContainerId) }:
+      case CloseContainerClientboundPacket:
+        CurrentMenu = null;
+        await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
+        return true;
+
+      default:
+        return false;
+    }
+  }
+
+  [Obsolete($"The default inventory menu is shown in menus but doesn't own the player inventory, use {nameof(SetInventoryMenuAsync)} per player instead.")]
   public static void SetDefaultInventoryMenu(Menu menu)
   {
     defaultInventoryMenu = menu;

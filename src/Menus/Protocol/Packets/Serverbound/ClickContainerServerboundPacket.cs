@@ -43,7 +43,7 @@ public class ClickContainerServerboundPacket : IMinecraftServerboundPacket<Click
     {
       ContainerId = buffer.ReadVarInt(),
       StateId = buffer.ReadVarInt(),
-      Slot = buffer.ReadUnsignedShort(),
+      Slot = buffer.ReadShort(),
       Button = buffer.ReadUnsignedByte(),
       Mode = buffer.ReadVarInt(),
       SkippedBytes = [..buffer.ReadToEnd()]
