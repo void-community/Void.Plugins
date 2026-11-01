@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/void-community/Void.Plugins/compare/Menus-v0.1.1...Menus-v0.1.2) (2026-11-01)
+
+
+### Features
+
+* **menus:** click the held hotbar item on left click ([#81](https://github.com/void-community/Void.Plugins/issues/81)) ([fe418eb](https://github.com/void-community/Void.Plugins/commit/fe418eb371588f979057c61885e42afcc6a59ff2))
+
 ## [0.1.1](https://github.com/void-community/Void.Plugins/compare/Menus-v0.1.0...Menus-v0.1.1) (2026-11-01)
 
 
