@@ -28,6 +28,11 @@ jobs:
 
   push:
     needs: set-matrix
+    # nuget.org trusted publishing exchanges the job's OIDC token for a short-lived API key.
+    # Its policy must name this file (nuget.yml): it checks the job_workflow_ref claim, which names the reusable workflow.
+    permissions:
+      contents: read
+      id-token: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     if: ${{ fromJSON(inputs.release-info).releases_created == 'true' }}
@@ -60,9 +65,17 @@ jobs:
         shell: bash
         run: mv artifacts/Void.Plugins.${{ matrix.component }}.${{ fromJSON(inputs.release-info)[format('{0}--version', matrix.path)] }}.nupkg artifacts/${{ matrix.slug }}.nupkg
 
+      # The temporary API key is valid for an hour, so it is requested right before pushing
+      - name: NuGet Login
+        id: login
+        if: ${{ fromJSON(inputs.release-info)[format('{0}--release_created', matrix.path)] == 'true' }}
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: NuGet Push ${{ matrix.component }}
         if: ${{ fromJSON(inputs.release-info)[format('{0}--release_created', matrix.path)] == 'true' }}
-        run: dotnet nuget push artifacts/${{ matrix.slug }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push artifacts/${{ matrix.slug }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
 
       - name: Upload ${{ matrix.component }} Build Artifact
         if: ${{ fromJSON(inputs.release-info)[format('{0}--release_created', matrix.path)] == 'true' }}
