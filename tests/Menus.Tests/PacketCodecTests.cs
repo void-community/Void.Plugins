@@ -137,8 +137,9 @@ public class PacketCodecTests
 
   [Theory]
   [InlineData(new byte[] { 0x00 }, 340, 0)] // 1.12.2 signed byte
-  [InlineData(new byte[] { 0x05 }, 767, 5)]
-  [InlineData(new byte[] { 0x00 }, 774, 0)] // VarInt
+  [InlineData(new byte[] { 0xFE }, 767, -2)] // Last version with a signed byte
+  [InlineData(new byte[] { 0xFE, 0xFF, 0xFF, 0xFF, 0x0F }, 768, -2)] // First version with a VarInt
+  [InlineData(new byte[] { 0x00 }, 774, 0)]
   public void PlaceRecipeDecodesContainerId(byte[] bytes, int protocol, int containerId)
   {
     var buffer = new MinecraftBuffer(bytes.AsSpan());

@@ -75,6 +75,9 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   private long lastBackendResyncTimestamp;
   private int backendResyncScheduled;
 
+  // The player clicked in their real inventory since a delayed resync was scheduled
+  private int playerInventoryClickForwarded;
+
   public Menu? InventoryMenu => ownedInventoryMenu ?? defaultInventoryMenu;
   private Menu? currentMenu;
 
@@ -344,42 +347,71 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     if (player.ProtocolVersion < ProtocolVersion.MINECRAFT_1_17_1)
       return;
 
-    var elapsed = Stopwatch.GetElapsedTime(Interlocked.Read(ref lastBackendResyncTimestamp));
+    var lastTimestamp = Interlocked.Read(ref lastBackendResyncTimestamp);
+    var elapsed = Stopwatch.GetElapsedTime(lastTimestamp);
 
-    if (elapsed < BackendResyncInterval)
+    // Claiming the timestamp keeps concurrent requests from both sending right away
+    if (elapsed >= BackendResyncInterval && Interlocked.CompareExchange(ref lastBackendResyncTimestamp, Stopwatch.GetTimestamp(), lastTimestamp) == lastTimestamp)
     {
-      // The answer to the last resync may reach the client before this click's prediction, so send one more once the interval passed
-      if (Interlocked.Exchange(ref backendResyncScheduled, 1) == 0)
-        _ = SendDelayedBackendResyncAsync(BackendResyncInterval - elapsed);
-
+      await SendBackendResyncAsync(cancellationToken);
       return;
     }
 
-    await SendBackendResyncAsync(cancellationToken);
+    // The answer to the last resync may reach the client before this click's prediction, so send one more once the interval passed
+    if (Interlocked.Exchange(ref backendResyncScheduled, 1) != 0)
+      return;
+
+    Interlocked.Exchange(ref playerInventoryClickForwarded, 0);
+
+    var delay = BackendResyncInterval - Stopwatch.GetElapsedTime(Interlocked.Read(ref lastBackendResyncTimestamp));
+    _ = SendDelayedBackendResyncAsync(delay > TimeSpan.Zero ? delay : TimeSpan.Zero);
   }
 
   private async Task SendDelayedBackendResyncAsync(TimeSpan delay)
   {
+    // The player context may be gone once the delay passed
+    var playerName = playerContext.Player.Profile?.Username ?? "unknown";
+
     try
     {
       await Task.Delay(delay);
+
+      // Claim the timestamp before allowing new requests, so a request in between waits instead of sending right away
+      Interlocked.Exchange(ref lastBackendResyncTimestamp, Stopwatch.GetTimestamp());
       Interlocked.Exchange(ref backendResyncScheduled, 0);
+
+      if (!IsDelayedBackendResyncSafe())
+        return;
 
       // The player may have disconnected meanwhile, so the request's cancellation token is not used
       await SendBackendResyncAsync(CancellationToken.None);
     }
     catch (Exception exception)
     {
-      logger.LogDebug(exception, "Delayed backend inventory resync for {Player} failed", playerContext.Player.Profile?.Username ?? "unknown");
+      logger.LogDebug(exception, "Delayed backend inventory resync for {Player} failed", playerName);
     }
+  }
+
+  // Things may have changed during the delay, and the resync click is not harmless in every state
+  private bool IsDelayedBackendResyncSafe()
+  {
+    // The backend drops a stack the player holds on its cursor in their real inventory,
+    // and answers the player's own clicks there anyway
+    if (Volatile.Read(ref playerInventoryClickForwarded) != 0)
+      return false;
+
+    // The backend ignores clicks for container 0 while its own container is open
+    if (backendContainerOpen)
+      return false;
+
+    // Play packets would disconnect a player the backend moved back to configuration
+    return playerContext.Player.Phase == Phase.Play;
   }
 
   private async ValueTask SendBackendResyncAsync(CancellationToken cancellationToken)
   {
     if (!linkService.TryGetLink(playerContext.Player, out var link))
       return;
-
-    Interlocked.Exchange(ref lastBackendResyncTimestamp, Stopwatch.GetTimestamp());
 
     // The proxy doesn't know the real player inventory, so ask the backend to resend it.
     // Clicking outside the inventory with an empty cursor changes nothing, and the stale state id
@@ -555,6 +587,9 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
 
     if (@event.Message is ClickContainerServerboundPacket containerServerboundPacket)
     {
+      if (containerServerboundPacket.ContainerId == PlayerInventoryContainerId)
+        Interlocked.Exchange(ref playerInventoryClickForwarded, 1);
+
       if (containerServerboundPacket.ContainerId != MenuContainerId)
         return;
 
