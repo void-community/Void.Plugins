@@ -13,7 +13,7 @@ public class SetContainerPropertyTransformation(ILogger<SetContainerPropertyTran
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Downgrade to 1.21 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.21 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var containerId = wrapper.Read<VarIntProperty>();
     wrapper.Write(ByteProperty.FromPrimitive((byte)containerId.AsPrimitive));

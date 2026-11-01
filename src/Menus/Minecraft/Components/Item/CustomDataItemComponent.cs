@@ -24,12 +24,13 @@ public class CustomDataItemComponent : IItemComponent<CustomDataItemComponent>
   {
     return new CustomDataItemComponent
     {
-      Value = buffer.ReadTag()
+      // Components use network NBT, which has no root tag name
+      Value = buffer.ReadTag(readName: false)
     };
   }
 
   public void Write(ref MinecraftBuffer buffer)
   {
-    buffer.WriteTag(Value);
+    buffer.WriteTag(Value, writeName: false);
   }
 }

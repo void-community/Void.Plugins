@@ -1,4 +1,5 @@
 using Menus.Api;
+using Menus.Events;
 using Menus.Minecraft;
 using Menus.Minecraft.Components.Item;
 using Menus.Protocol.Packets.Clientbound;
@@ -12,13 +13,15 @@ using Void.Minecraft.Players.Extensions;
 using Void.Proxy.Api.Commands;
 using Void.Proxy.Api.Events;
 using Void.Proxy.Api.Events.Network;
+using Void.Proxy.Api.Events.Player;
+using Void.Proxy.Api.Events.Services;
 using Void.Proxy.Api.Links;
 using Void.Proxy.Api.Network;
 using Void.Proxy.Api.Players.Contexts;
 
 namespace Menus.Services;
 
-public class MenuService(ILogger<MenuService> logger, IPlayerContext playerContext, ICommandService commandService, ILinkService linkService) : IEventListener
+public class MenuService(ILogger<MenuService> logger, IPlayerContext playerContext, ICommandService commandService, ILinkService linkService, IEventService events) : IEventListener
 {
   // Vanilla servers cycle container ids through 1..100, so 127 never collides with a backend container
   // and still fits into the signed byte used by older protocol versions.
@@ -30,6 +33,29 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   private const int CursorSlot = -1;
   private const int OutsideSlot = -999;
 
+  // Container sizes the client expects, for types whose size doesn't change between versions
+  private static readonly Dictionary<Identifier, int> KnownMenuSizes = new()
+  {
+    ["minecraft:generic_9x1"] = 9,
+    ["minecraft:generic_9x2"] = 18,
+    ["minecraft:generic_9x3"] = 27,
+    ["minecraft:generic_9x4"] = 36,
+    ["minecraft:generic_9x5"] = 45,
+    ["minecraft:generic_9x6"] = 54,
+    ["minecraft:generic_3x3"] = 9,
+    ["minecraft:shulker_box"] = 27,
+    ["minecraft:hopper"] = 5,
+    ["minecraft:anvil"] = 3,
+    ["minecraft:beacon"] = 1,
+    ["minecraft:brewing_stand"] = 5,
+    ["minecraft:enchantment"] = 2,
+    ["minecraft:furnace"] = 3,
+    ["minecraft:blast_furnace"] = 3,
+    ["minecraft:smoker"] = 3,
+    ["minecraft:grindstone"] = 3,
+    ["minecraft:crafting"] = 10
+  };
+
   private static Menu? defaultInventoryMenu;
 
   private Menu? ownedInventoryMenu;
@@ -40,8 +66,13 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   // Backend containers show the real player inventory below them
   private bool backendContainerOpen;
 
+  // Clients echo it back in clicks, vanilla wraps it the same way
+  private int stateId;
+
   public Menu? InventoryMenu => ownedInventoryMenu ?? defaultInventoryMenu;
-  public Menu? CurrentMenu;
+  private Menu? currentMenu;
+
+  public Menu? CurrentMenu => currentMenu;
 
   /// <summary>
   /// Shows <paramref name="menu"/> as the player inventory. While it is set, the proxy owns the player inventory:
@@ -75,10 +106,14 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     var player = playerContext.Player;
 
     var isPlayerInventory = menu.Type == "minecraft:inventory";
+    Menu? previousMenu = null;
 
     if (!isPlayerInventory)
     {
-      CurrentMenu = menu;
+      if (KnownMenuSizes.TryGetValue(menu.Type, out var expectedSize) && menu.Size != expectedSize)
+        logger.LogWarning("Menu {Menu} of type {Type} has size {Size}, the client expects {ExpectedSize}", menu.Name, menu.Type, menu.Size, expectedSize);
+
+      previousMenu = Interlocked.Exchange(ref currentMenu, menu);
 
       // Opening a screen replaces whatever the backend had open, so close it on the backend too.
       // This keeps the backend on the player inventory, which ResyncAsync relies on.
@@ -87,7 +122,7 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
 
       backendContainerOpen = false;
 
-      logger.LogTrace($"Opening menu {menu.Name} for {PlayerExtensions.get_Profile(playerContext.Player)?.Username ?? "unknown"}");
+      logger.LogTrace("Opening menu {Menu} for {Player}", menu.Name, player.Profile?.Username ?? "unknown");
       var openContainerPacket = new OpenContainerClientboundPacket
       {
         ContainerId = MenuContainerId,
@@ -98,14 +133,16 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     }
 
     await UpdateSlotsAsync(menu, cancellationToken);
+
+    // Raised once the client shows the menu, so handlers can change or close it
+    if (!isPlayerInventory)
+      await RaiseMenuChangedAsync(previousMenu, menu, cancellationToken);
   }
 
   public async ValueTask CloseAsync(CancellationToken cancellationToken)
   {
-    if (CurrentMenu is null)
+    if (Interlocked.Exchange(ref currentMenu, null) is not { } menu)
       return;
-
-    CurrentMenu = null;
 
     var closeContainerPacket = new CloseContainerClientboundPacket
     {
@@ -113,9 +150,18 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     };
 
     await playerContext.Player.SendPacketAsync(closeContainerPacket, cancellationToken);
+
+    // Raised once the client closed the menu, so handlers can open another one
+    await RaiseMenuChangedAsync(menu, null, cancellationToken);
   }
 
-  public async ValueTask SetProperty(int property, int value, CancellationToken cancellationToken)
+  [Obsolete($"Use {nameof(SetPropertyAsync)} instead.")]
+  public ValueTask SetProperty(int property, int value, CancellationToken cancellationToken)
+  {
+    return SetPropertyAsync(property, value, cancellationToken);
+  }
+
+  public async ValueTask SetPropertyAsync(int property, int value, CancellationToken cancellationToken)
   {
     if (CurrentMenu is null)
       return;
@@ -128,6 +174,35 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     };
 
     await playerContext.Player.SendPacketAsync(setContainerPropertyPacket, cancellationToken);
+  }
+
+  /// <summary>
+  /// Sets or clears a slot of the open menu without reopening it. The menu passed to <see cref="OpenAsync"/> is not changed,
+  /// <see cref="CurrentMenu"/> and the menu in later events are a copy with the new item.
+  /// </summary>
+  public async ValueTask SetItemAsync(int slot, MenuItem? item, CancellationToken cancellationToken)
+  {
+    if (CurrentMenu is not { } menu)
+      return;
+
+    ArgumentOutOfRangeException.ThrowIfNegative(slot);
+    ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(slot, menu.Size);
+
+    var itemsMap = new Dictionary<int, MenuItem>(menu.ItemsMap);
+
+    if (item is null)
+      itemsMap.Remove(slot);
+    else
+      itemsMap[slot] = item;
+
+    var updatedMenu = menu with { ItemsMap = itemsMap };
+
+    // The menu may have been closed or replaced meanwhile, for example from a timer.
+    // Same menu for the player, so no opened or closed events.
+    if (Interlocked.CompareExchange(ref currentMenu, updatedMenu, menu) != menu)
+      return;
+
+    await UpdateSlotAsync(updatedMenu, slot, cancellationToken);
   }
 
   public async ValueTask UpdateSlotsAsync(Menu menu, CancellationToken cancellationToken)
@@ -149,11 +224,13 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     var isPlayerInventory = menu.Type == "minecraft:inventory";
     var itemStack = CreateItemStack(menu, slot);
 
-    logger.LogTrace(
-      $"Setting slot {slot} in container {(isPlayerInventory ? PlayerInventoryContainerId : MenuContainerId)} to {itemStack?.Identifier ?? "air"} for {PlayerExtensions.get_Profile(playerContext.Player)?.Username ?? "unknown"}");
+    var containerId = isPlayerInventory ? PlayerInventoryContainerId : MenuContainerId;
+
+    logger.LogTrace("Setting slot {Slot} in container {ContainerId} to {Item} for {Player}", slot, containerId, itemStack?.Identifier.ToString() ?? "air", playerContext.Player.Profile?.Username ?? "unknown");
     var setSlotPacket = new SetContainerSlotClientboundPacket
     {
-      ContainerId = isPlayerInventory ? PlayerInventoryContainerId : MenuContainerId,
+      ContainerId = containerId,
+      StateId = NextStateId(),
       Slot = slot,
       ItemStack = itemStack
     };
@@ -161,25 +238,43 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     await playerContext.Player.SendPacketAsync(setSlotPacket, cancellationToken);
   }
 
-  public async ValueTask ClickSlotAsync(Menu menu, int slot, ClickType clickType, CancellationToken cancellationToken)
+  public ValueTask ClickSlotAsync(Menu menu, int slot, ClickType clickType, CancellationToken cancellationToken)
   {
-    MenuItem? item = null;
+    return ClickSlotAsync(menu, slot, clickType, hotbarSlot: null, cancellationToken);
+  }
+
+  private async ValueTask ClickSlotAsync(Menu menu, int slot, ClickType clickType, int? hotbarSlot, CancellationToken cancellationToken)
+  {
     var isPlayerInventory = menu.Type == "minecraft:inventory";
 
     // Slots past a container menu belong to the player inventory below it
     if (!isPlayerInventory && slot >= menu.Size)
     {
-      if (InventoryMenu is not null)
+      if (InventoryMenu is null)
+        return;
+
+      slot = slot - menu.Size + InventoryMenu.Size;
+      menu = InventoryMenu;
+    }
+
+    if (!menu.ItemsMap.TryGetValue(slot, out var item))
+      return;
+
+    var click = new MenuClick(playerContext.Player, menu, slot, item, clickType, hotbarSlot);
+    await RaiseAsync(new MenuClickedEvent(click), cancellationToken);
+
+    if (item.OnClick is not null)
+    {
+      // Clicks are handled inside the packet pipeline, which must not see plugin exceptions
+      try
       {
-        var inventorySlot = slot - menu.Size + InventoryMenu.Size;
-        item = InventoryMenu.ItemsMap.GetValueOrDefault(inventorySlot);
+        await item.OnClick(click, cancellationToken);
+      }
+      catch (Exception exception) when (exception is not OperationCanceledException)
+      {
+        logger.LogError(exception, "Click handler of slot {Slot} in menu {Menu} failed", slot, menu.Name);
       }
     }
-    else
-      item = menu.ItemsMap.GetValueOrDefault(slot);
-
-    if (item is null)
-      return;
 
     switch (clickType)
     {
@@ -194,11 +289,11 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
 
   private async ValueTask SendContentAsync(int containerId, Menu menu, int size, CancellationToken cancellationToken)
   {
-    logger.LogTrace(
-      $"Setting {size} slots in container {containerId} from menu {menu.Name} for {PlayerExtensions.get_Profile(playerContext.Player)?.Username ?? "unknown"}");
+    logger.LogTrace("Setting {Size} slots in container {ContainerId} from menu {Menu} for {Player}", size, containerId, menu.Name, playerContext.Player.Profile?.Username ?? "unknown");
     var setContentPacket = new SetContainerContentClientboundPacket
     {
       ContainerId = containerId,
+      StateId = NextStateId(),
       ItemStacks = Enumerable.Range(0, size).Select(slot => CreateItemStack(menu, slot)).ToList()
     };
 
@@ -265,6 +360,69 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     await link.SendPacketAsync(resyncClickPacket, cancellationToken);
   }
 
+  private async ValueTask RaiseMenuChangedAsync(Menu? previousMenu, Menu? menu, CancellationToken cancellationToken)
+  {
+    if (previousMenu is not null)
+      await RaiseAsync(new MenuClosedEvent(playerContext.Player, previousMenu), cancellationToken);
+
+    // A closed handler may have opened another menu already
+    if (menu is not null && currentMenu == menu)
+      await RaiseAsync(new MenuOpenedEvent(playerContext.Player, menu), cancellationToken);
+  }
+
+  // The client already closed the menu, for example because the backend opened a container
+  private async ValueTask ClearCurrentMenuAsync(CancellationToken cancellationToken)
+  {
+    if (Interlocked.Exchange(ref currentMenu, null) is { } menu)
+      await RaiseAsync(new MenuClosedEvent(playerContext.Player, menu), cancellationToken);
+  }
+
+  private async ValueTask RaiseAsync<TEvent>(TEvent @event, CancellationToken cancellationToken) where TEvent : IScopedEvent
+  {
+    // Menu events are raised inside the packet pipeline, which must not see plugin exceptions
+    try
+    {
+      await events.ThrowAsync(@event, cancellationToken);
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+      logger.LogError(exception, "Handling {Event} failed", typeof(TEvent).Name);
+    }
+  }
+
+  private int NextStateId()
+  {
+    return Interlocked.Increment(ref stateId) & 0x7FFF;
+  }
+
+  private static ClickType? GetClickType(int mode, int button)
+  {
+    return (mode, button) switch
+    {
+      (0, 0) => ClickType.LeftMouseButton,
+      (0, 1) => ClickType.RightMouseButton,
+      (1, 0) => ClickType.ShiftLeftMouseButton,
+      (1, 1) => ClickType.ShiftRightMouseButton,
+      (2, >= 0 and <= 8) => ClickType.NumberKey,
+      (2, 40) => ClickType.SwapOffhand,
+      (3, _) => ClickType.MiddleMouseButton,
+      (4, 0) => ClickType.Drop,
+      (4, 1) => ClickType.DropStack,
+      (6, _) => ClickType.DoubleClick,
+      // Dragging spreads the cursor over slots instead of clicking one
+      _ => null
+    };
+  }
+
+  private async ValueTask HandleClickAsync(Menu menu, ClickContainerServerboundPacket clickPacket, CancellationToken cancellationToken)
+  {
+    if (GetClickType(clickPacket.Mode, clickPacket.Button) is not { } clickType)
+      return;
+
+    int? hotbarSlot = clickType is ClickType.NumberKey ? clickPacket.Button : null;
+    await ClickSlotAsync(menu, clickPacket.Slot, clickType, hotbarSlot, cancellationToken);
+  }
+
   // Main inventory and hotbar, plus the offhand slot since 1.9
   private int GetInventoryMenuSize(Menu inventoryMenu)
   {
@@ -287,6 +445,12 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     if (item.Profile is not null)
       components.Add(new ResolvableProfileItemComponent { Kind = Kind.Partial, Profile = item.Profile });
 
+    if (item.Damage is { } damage)
+      components.Add(new DamageItemComponent { Value = damage });
+
+    if (item.CustomData is not null)
+      components.Add(new CustomDataItemComponent { Value = item.CustomData });
+
     return new ItemStack
     {
       Identifier = item.Identifier,
@@ -296,14 +460,24 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   }
 
   [Subscribe]
-  private void OnPhaseChanged(PhaseChangedEvent @event)
+  private async ValueTask OnPhaseChanged(PhaseChangedEvent @event, CancellationToken cancellationToken)
   {
     if (@event.Side is not Side.Server)
       return;
 
-    // Joining a server starts with a fresh client inventory and no containers open
+    // Joining a server starts with a fresh client inventory and no screens open
     inventoryInitialized = false;
     backendContainerOpen = false;
+    await ClearCurrentMenuAsync(cancellationToken);
+  }
+
+  [Subscribe]
+  private async ValueTask OnPlayerDisconnected(PlayerDisconnectedEvent @event, CancellationToken cancellationToken)
+  {
+    if (@event.Player != playerContext.Player)
+      return;
+
+    await ClearCurrentMenuAsync(cancellationToken);
   }
 
   [Subscribe]
@@ -330,15 +504,14 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     {
       // The backend never saw this container, and vanilla closes whatever is open regardless of the id
       @event.Cancel();
-      CurrentMenu = null;
+      await ClearCurrentMenuAsync(cancellationToken);
       return;
     }
 
-    if (@event.Message is CloseContainerClientboundPacket or CloseContainerServerboundPacket
-        or OpenContainerClientboundPacket)
-    {
-      CurrentMenu = null;
-    }
+    // Both replace whatever screen the client shows. Closes of other containers sent by the client
+    // only reach the backend after the menu was opened over them.
+    if (@event.Message is CloseContainerClientboundPacket or OpenContainerClientboundPacket)
+      await ClearCurrentMenuAsync(cancellationToken);
 
     if (@event.Message is ClickContainerServerboundPacket containerServerboundPacket)
     {
@@ -356,11 +529,7 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
         return;
 
       await ResyncAsync(menu, cancellationToken);
-
-      if (containerServerboundPacket.Mode > 0)
-        return;
-
-      await ClickSlotAsync(menu, containerServerboundPacket.Slot, (ClickType) containerServerboundPacket.Button, cancellationToken);
+      await HandleClickAsync(menu, containerServerboundPacket, cancellationToken);
     }
   }
 
@@ -396,10 +565,7 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
           return true;
 
         await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
-
-        if (clickPacket.Mode == 0)
-          await ClickSlotAsync(inventoryMenu, clickPacket.Slot, (ClickType) clickPacket.Button, cancellationToken);
-
+        await HandleClickAsync(inventoryMenu, clickPacket, cancellationToken);
         return true;
 
       case SetCreativeModeSlotServerboundPacket:
@@ -410,8 +576,11 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
 
       // Backend containers show the real player inventory below them, so show the menu again once they close
       case CloseContainerServerboundPacket { ContainerId: not (PlayerInventoryContainerId or MenuContainerId) }:
+        await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
+        return true;
+
       case CloseContainerClientboundPacket:
-        CurrentMenu = null;
+        await ClearCurrentMenuAsync(cancellationToken);
         await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
         return true;
 

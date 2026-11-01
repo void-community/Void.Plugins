@@ -57,10 +57,21 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
       PassthroughGzipedNbt(wrapper, fromProtocolVersion, toProtocolVersion);
   }
 
+  // Before 1.13 the meta is either an item variant, like the wool color, or the damage of a damageable item
+  private static (Identifier Identifier, int? Damage) ResolveItemWithMeta(ProtocolVersion protocolVersion, int itemId, int itemMeta)
+  {
+    var itemIdentifier = MinecraftItemRegistry.GetIdentifier(protocolVersion, itemId, itemMeta);
+
+    if (itemMeta == 0 || itemIdentifier != "minecraft:air")
+      return (itemIdentifier, null);
+
+    return (MinecraftItemRegistry.GetIdentifier(protocolVersion, itemId, 0), itemMeta);
+  }
+
   public void PassthroughGzipedNbt(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Passthrough gziped nbt {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough gziped nbt {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var itemId = wrapper.Read<ShortProperty>();
     if (itemId.AsPrimitive == -1)
@@ -72,10 +83,9 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
     var count = wrapper.Read<ByteProperty>();
     var itemMeta = wrapper.Read<ShortProperty>();
 
-    var itemIdentifier =
-      MinecraftItemRegistry.GetIdentifier(fromProtocolVersion, itemId.AsPrimitive, itemMeta.AsPrimitive);
+    var (itemIdentifier, damage) = ResolveItemWithMeta(fromProtocolVersion, itemId.AsPrimitive, itemMeta.AsPrimitive);
     var updatedItemId = MinecraftItemRegistry.GetId(toProtocolVersion, itemIdentifier);
-    var updatedItemMeta = MinecraftItemRegistry.GetMeta(toProtocolVersion, itemIdentifier);
+    var updatedItemMeta = damage ?? MinecraftItemRegistry.GetMeta(toProtocolVersion, itemIdentifier);
 
     wrapper.Write(ShortProperty.FromPrimitive((short)updatedItemId));
     wrapper.Write(count);
@@ -88,7 +98,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void FromNbtToGzipedNbt(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"From nbt to gziped nbt {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("From nbt to gziped nbt {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var itemId = wrapper.Read<ShortProperty>();
     if (itemId.AsPrimitive == -1)
@@ -100,10 +110,9 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
     var count = wrapper.Read<ByteProperty>();
     var itemMeta = wrapper.Read<ShortProperty>();
 
-    var itemIdentifier =
-      MinecraftItemRegistry.GetIdentifier(fromProtocolVersion, itemId.AsPrimitive, itemMeta.AsPrimitive);
+    var (itemIdentifier, damage) = ResolveItemWithMeta(fromProtocolVersion, itemId.AsPrimitive, itemMeta.AsPrimitive);
     var updatedItemId = MinecraftItemRegistry.GetId(toProtocolVersion, itemIdentifier);
-    var updatedItemMeta = MinecraftItemRegistry.GetMeta(toProtocolVersion, itemIdentifier);
+    var updatedItemMeta = damage ?? MinecraftItemRegistry.GetMeta(toProtocolVersion, itemIdentifier);
 
     wrapper.Write(ShortProperty.FromPrimitive((short)updatedItemId));
     wrapper.Write(count);
@@ -125,7 +134,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void PassthroughIdWithMeta(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Passthrough id with meta {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough id with meta {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var itemId = wrapper.Read<ShortProperty>();
     if (itemId.AsPrimitive == -1)
@@ -137,10 +146,9 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
     var count = wrapper.Read<ByteProperty>();
     var itemMeta = wrapper.Read<ShortProperty>();
 
-    var itemIdentifier =
-      MinecraftItemRegistry.GetIdentifier(fromProtocolVersion, itemId.AsPrimitive, itemMeta.AsPrimitive);
+    var (itemIdentifier, damage) = ResolveItemWithMeta(fromProtocolVersion, itemId.AsPrimitive, itemMeta.AsPrimitive);
     var updatedItemId = MinecraftItemRegistry.GetId(toProtocolVersion, itemIdentifier);
-    var updatedItemMeta = MinecraftItemRegistry.GetMeta(toProtocolVersion, itemIdentifier);
+    var updatedItemMeta = damage ?? MinecraftItemRegistry.GetMeta(toProtocolVersion, itemIdentifier);
 
     wrapper.Write(ShortProperty.FromPrimitive((short)updatedItemId));
     wrapper.Write(count);
@@ -152,7 +160,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void FromIdToIdWithMeta(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"From id to id with meta {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("From id to id with meta {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var itemId = wrapper.Read<ShortProperty>();
     if (itemId.AsPrimitive == -1)
@@ -167,9 +175,29 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
     wrapper.Write(ShortProperty.FromPrimitive((short)updatedItemId));
 
     wrapper.Passthrough<ByteProperty>(); // Count
-    wrapper.Write(ShortProperty.FromPrimitive((short)itemMeta)); // Damage
 
     var nbt = wrapper.Read<NamedNbtProperty>().AsNbtTag;
+
+    // Before 1.13 damageable items keep their damage in the meta instead of a tag.
+    // Items with variants, like wool, use the meta for the variant instead.
+    if (itemMeta == 0 && nbt is NbtCompound damageCompound)
+    {
+      int? damage = damageCompound["Damage"] switch
+      {
+        NbtShort damageShort => damageShort.Value,
+        NbtInt damageInt => damageInt.Value,
+        _ => null
+      };
+
+      if (damage is > 0 && MinecraftItemRegistry.GetIdentifier(toProtocolVersion, updatedItemId, damage.Value) == "minecraft:air")
+      {
+        itemMeta = damage.Value;
+        damageCompound.Fields.Remove("Damage");
+      }
+    }
+
+    wrapper.Write(ShortProperty.FromPrimitive((short)itemMeta)); // Damage
+
     if (nbt is NbtCompound compound)
     {
       var display = compound["display"] as NbtCompound;
@@ -190,7 +218,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void PassthroughNegativeId(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Passthrough negative id {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough negative id {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var itemId = wrapper.Read<ShortProperty>();
     if (itemId.AsPrimitive == -1)
@@ -210,7 +238,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void FromPresendToNegativeId(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"From present to negative id {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("From present to negative id {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var isPresent = wrapper.Read<BoolProperty>();
     if (!isPresent.AsPrimitive)
@@ -231,7 +259,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void FromJsonLoreToStringLore(IMinecraftBinaryPacketWrapper wrapper, ProtocolVersion fromProtocolVersion,
     ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"From json lore to string lore {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("From json lore to string lore {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var isPresent = wrapper.Passthrough<BoolProperty>();
     if (!isPresent.AsPrimitive)
@@ -276,7 +304,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void PassthroughNamedNbt(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Passthrough named nbt {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough named nbt {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var isPresent = wrapper.Passthrough<BoolProperty>();
     if (!isPresent.AsPrimitive)
@@ -294,7 +322,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void FromNbtToNamedNbt(IMinecraftBinaryPacketWrapper wrapper, ProtocolVersion fromProtocolVersion,
     ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"From nbt to named nbt {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("From nbt to named nbt {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var isPresent = wrapper.Passthrough<BoolProperty>();
     if (!isPresent.AsPrimitive)
@@ -314,7 +342,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void PassthroughNbt(IMinecraftBinaryPacketWrapper wrapper, ProtocolVersion fromProtocolVersion,
     ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Passthrough nbt {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough nbt {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var isPresent = wrapper.Passthrough<BoolProperty>();
     if (!isPresent.AsPrimitive)
@@ -332,7 +360,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void FromComponentToNbt(IMinecraftBinaryPacketWrapper wrapper, ProtocolVersion fromProtocolVersion,
     ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"From component to nbt {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("From component to nbt {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var count = wrapper.Read<VarIntProperty>();
 
@@ -365,7 +393,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
       else if (ProfileItemComponent.GetId(fromProtocolVersion) == componentId.AsPrimitive)
         componentsToAdd.Add(wrapper.Read<ProfileItemComponentProperty>().Value);
       else
-        logger.LogError($"Unknown item component with id {componentId.AsPrimitive} in protocol {fromProtocolVersion}");
+        logger.LogError("Unknown item component with id {ComponentId} in protocol {ProtocolVersion}", componentId.AsPrimitive, fromProtocolVersion);
     }
 
     wrapper.Write(BoolProperty.FromPrimitive(true));
@@ -439,7 +467,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
   public void PassthroughComponent(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Passthrough component {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough component {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var count = wrapper.Passthrough<VarIntProperty>();
     if (count.AsPrimitive == 0)
@@ -517,7 +545,7 @@ public class ItemStackTransformation(ILogger<ItemStackTransformation> logger)
         continue;
       }
 
-      logger.LogError($"Unknown item component with id {componentId.AsPrimitive} in protocol {fromProtocolVersion}");
+      logger.LogError("Unknown item component with id {ComponentId} in protocol {ProtocolVersion}", componentId.AsPrimitive, fromProtocolVersion);
     }
   }
 }

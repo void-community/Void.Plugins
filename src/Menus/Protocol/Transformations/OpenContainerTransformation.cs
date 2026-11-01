@@ -12,7 +12,7 @@ public class OpenContainerTransformation(ILogger<OpenContainerTransformation> lo
   public void Passthrough_1_7_2_plus(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Pasthrough 1.7.2+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.7.2+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
 
@@ -33,7 +33,7 @@ public class OpenContainerTransformation(ILogger<OpenContainerTransformation> lo
   public void DowngradeTo_1_7_6(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Downgrade to 1.7.6 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.7.6 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>();
 
@@ -56,7 +56,7 @@ public class OpenContainerTransformation(ILogger<OpenContainerTransformation> lo
   public void Passthrough_1_8_plus(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Pasthrough 1.8+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.8+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
 
@@ -76,7 +76,7 @@ public class OpenContainerTransformation(ILogger<OpenContainerTransformation> lo
   public void DowngradeTo_1_13_2(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Downgrade to 1.13.2 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.13.2 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var containerId = wrapper.Read<VarIntProperty>();
     wrapper.Write(ByteProperty.FromPrimitive((byte) containerId.AsPrimitive));
@@ -94,7 +94,7 @@ public class OpenContainerTransformation(ILogger<OpenContainerTransformation> lo
   public void Passthrough_1_14_plus(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Pasthrough 1.14+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.14+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<VarIntProperty>(); // Container id
 
@@ -109,7 +109,7 @@ public class OpenContainerTransformation(ILogger<OpenContainerTransformation> lo
   public void DowngradeTo_1_20_2(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Downgrade to 1.20.2 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.20.2 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<VarIntProperty>(); // Container id
 
@@ -127,7 +127,7 @@ public class OpenContainerTransformation(ILogger<OpenContainerTransformation> lo
   public void Passthrough_1_20_3_plus(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Pasthrough 1.20.3+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.20.3+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<VarIntProperty>(); // Container id
 
