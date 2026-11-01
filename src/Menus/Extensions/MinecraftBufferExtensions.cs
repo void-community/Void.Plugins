@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Reflection;
 using Menus.Minecraft;
 using Menus.Minecraft.Components.Item;
 using Void.Data.Api.Minecraft;
@@ -8,6 +10,8 @@ namespace Menus.Extensions;
 
 public static class MinecraftBufferExtensions
 {
+  private static readonly ConcurrentDictionary<Type, Func<ProtocolVersion, int>> ComponentIdGetters = new();
+
   public static void WriteItemStack(this ref MinecraftBuffer buffer, ItemStack? itemStack)
   {
     if (itemStack == null || itemStack.Count == 0)
@@ -26,16 +30,18 @@ public static class MinecraftBufferExtensions
 
     foreach (var component in itemStack.Components)
     {
-      var decodeMethod = component.GetType().GetMethod(nameof(IItemComponent<>.GetId));
-      if (decodeMethod is null)
-        throw new Exception("Unable to find GetId method.");
-
-      var id = decodeMethod.Invoke(null, [ProtocolVersion.Latest]);
-      if (id is null)
-        throw new Exception("Unable to find GetId method.");
-
-      buffer.WriteVarInt((int)id);
+      buffer.WriteVarInt(GetComponentId(component, ProtocolVersion.Latest));
       component.Write(ref buffer);
     }
+  }
+
+  // GetId is a static interface member, so it is looked up once per component type
+  private static int GetComponentId(IItemComponent component, ProtocolVersion protocolVersion)
+  {
+    var getId = ComponentIdGetters.GetOrAdd(component.GetType(), type =>
+      type.GetMethod(nameof(IItemComponent<>.GetId), BindingFlags.Public | BindingFlags.Static)?.CreateDelegate<Func<ProtocolVersion, int>>()
+      ?? throw new InvalidOperationException($"{type} has no static {nameof(IItemComponent<>.GetId)} method."));
+
+    return getId(protocolVersion);
   }
 }

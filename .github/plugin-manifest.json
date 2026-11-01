@@ -1,7 +1,7 @@
 {
   "plugins": [
     { "component": "BossBars",        "path": "src/BossBars",        "slug": "void-bossbars" },
-    { "component": "Menus",           "path": "src/Menus",           "slug": "void-menus" },
+    { "component": "Menus",           "path": "src/Menus",           "slug": "void-menus",            "tests": "tests/Menus.Tests" },
     { "component": "PlayerPositions", "path": "src/PlayerPositions", "slug": "void-player-positions" },
     { "component": "TabLists",        "path": "src/TabLists",        "slug": "void-tab-lists" }
   ]

@@ -10,7 +10,7 @@ public class ClickContainerTransformation(ILogger<ClickContainerTransformation> 
   public void UpgradeTo_1_9(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Upgrade to 1.9 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Upgrade to 1.9 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Passthrough<ShortProperty>(); // Slot
@@ -26,7 +26,7 @@ public class ClickContainerTransformation(ILogger<ClickContainerTransformation> 
   public void UpgradeTo_1_17(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Upgrade to 1.17 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Upgrade to 1.17 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Passthrough<ShortProperty>(); // Slot
@@ -39,7 +39,7 @@ public class ClickContainerTransformation(ILogger<ClickContainerTransformation> 
   public void UpgradeTo_1_17_1(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Upgrade to 1.17.1 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Upgrade to 1.17.1 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Write(VarIntProperty.FromPrimitive(0)); // State id
@@ -52,7 +52,7 @@ public class ClickContainerTransformation(ILogger<ClickContainerTransformation> 
   public void UpgradeTo_1_21_2(IMinecraftBinaryPacketWrapper wrapper,
     ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
   {
-    logger.LogTrace($"Upgrade to 1.21.2 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Upgrade to 1.21.2 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var containerId = wrapper.Read<ByteProperty>();
     wrapper.Write(VarIntProperty.FromPrimitive(containerId.AsPrimitive));

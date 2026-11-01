@@ -1,0 +1,22 @@
+name: "Pull Request Title"
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  # Pull requests are squash merged with their title, which release-please reads as a conventional commit
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check conventional commit title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|perf|refactor|docs|chore|ci|build|test|revert|style)(\([a-z0-9-]+\))?!?: .+'
+          if ! grep -qE "$pattern" <<< "$TITLE"; then
+            echo "::error::Pull request title \"$TITLE\" is not a conventional commit, for example \"fix(menus): restore cursor after click\""
+            exit 1
+          fi
+          echo "Title is a conventional commit: $TITLE"

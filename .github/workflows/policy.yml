@@ -10,9 +10,102 @@ jobs:
     with:
       release-please: false
 
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check plugin list consistency
+        run: |
+          set -euo pipefail
+          manifest_paths=$(jq -r '.plugins[].path' .github/plugin-manifest.json | sort)
+          rp_config_paths=$(jq -r '.packages | keys[]' .github/RELEASE_PLEASE/config.json | sort)
+          rp_manifest_paths=$(jq -r 'keys[]' .github/RELEASE_PLEASE/manifest.json | sort)
+          diff <(echo "$manifest_paths") <(echo "$rp_config_paths") \
+            || { echo "::error::plugin-manifest.json vs RELEASE_PLEASE/config.json drift"; exit 1; }
+          diff <(echo "$manifest_paths") <(echo "$rp_manifest_paths") \
+            || { echo "::error::plugin-manifest.json vs RELEASE_PLEASE/manifest.json drift"; exit 1; }
+          for tests in $(jq -r '.plugins[] | select(.tests != null) | .tests' .github/plugin-manifest.json); do
+            [ -d "$tests" ] || { echo "::error::test project $tests listed in plugin-manifest.json does not exist"; exit 1; }
+          done
+          echo "Plugin lists are consistent."
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.changed.outputs.matrix }}
+      any: ${{ steps.changed.outputs.any }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find changed plugins with tests
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed_files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          # Changing this workflow runs every test project, so the test job itself gets exercised
+          run_all=false
+          if grep -qx '.github/workflows/policy.yml' <<< "$changed_files"; then run_all=true; fi
+          matrix=$(jq -c --arg files "$changed_files" --argjson all "$run_all" '
+            [.plugins[] | select(.tests != null) | . as $plugin
+              | select($all or ($files | split("\n") | any(startswith($plugin.path + "/") or startswith($plugin.tests + "/"))))]
+          ' .github/plugin-manifest.json)
+          echo "Plugins to test: $matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "$matrix" != "[]" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: [semver, changes]
+    if: ${{ needs.changes.outputs.any == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ needs.semver.outputs.dotnet-version }}
+          cache: true
+          cache-dependency-path: |
+            src/**/*.csproj
+            tests/**/*.csproj
+
+      - name: Test ${{ matrix.component }}
+        run: dotnet test ${{ matrix.tests }} --configuration Release
+
   build:
     needs: semver
     uses: ./.github/workflows/dotnet.yml
     with:
       dotnet-version: ${{ needs.semver.outputs.dotnet-version }}
       release-info: ${{ needs.semver.outputs.release-info }}
+
+  # The one check to require in the ruleset: other jobs may be skipped or renamed with the plugin list
+  checks:
+    if: ${{ always() }}
+    needs: [semver, validate, changes, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          # Skipped jobs are fine, the test job is skipped when no tested plugin changed
+          if echo "$RESULTS" | jq -e 'any(.[]; .result == "failure" or .result == "cancelled")' > /dev/null; then
+            echo "::error::A required job failed or was cancelled"
+            exit 1
+          fi

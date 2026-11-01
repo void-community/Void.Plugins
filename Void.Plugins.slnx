@@ -3,4 +3,5 @@
   <Project Path="src/Menus/Void.Plugins.Menus.csproj" />
   <Project Path="src/PlayerPositions/Void.Plugins.PlayerPositions.csproj" />
   <Project Path="src/TabLists/Void.Plugins.TabLists.csproj" />
+  <Project Path="tests/Menus.Tests/Void.Plugins.Menus.Tests.csproj" />
 </Solution>

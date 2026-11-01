@@ -13,7 +13,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Pasthrough 1.7.2+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.7.2+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Passthrough<ShortProperty>(); // Slot id
@@ -27,7 +27,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Downgrade to 1.17 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.17 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Read<VarIntProperty>(); // skip state id
@@ -42,7 +42,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Pasthrough 1.17.1+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.17.1+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Passthrough<VarIntProperty>(); // State id
@@ -57,7 +57,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Downgrade to 1.20.3 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.20.3 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Passthrough<VarIntProperty>(); // State id
@@ -72,7 +72,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Pasthrough 1.20.5+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.20.5+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<ByteProperty>(); // Container id
     wrapper.Passthrough<VarIntProperty>(); // State id
@@ -87,7 +87,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Downgrade to 1.21.2 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.21.2 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<VarIntProperty>(); // Container id
     wrapper.Passthrough<VarIntProperty>(); // State id
@@ -102,7 +102,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Downgrade to 1.21 {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Downgrade to 1.21 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     var containerId = wrapper.Read<VarIntProperty>();
     wrapper.Write(ByteProperty.FromPrimitive((byte)containerId.AsPrimitive));
@@ -119,7 +119,7 @@ public class SetContainerSlotTransformation(ILogger<SetContainerSlotTransformati
     if (fromProtocolVersion < toProtocolVersion)
       return;
 
-    logger.LogTrace($"Pasthrough 1.21.4+ {fromProtocolVersion} -> {toProtocolVersion}");
+    logger.LogTrace("Passthrough 1.21.4+ {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
 
     wrapper.Passthrough<VarIntProperty>(); // Container id
     wrapper.Passthrough<VarIntProperty>(); // State id

@@ -25,7 +25,7 @@ internal class TransformationService(
   ClickContainerTransformation clickContainerTransformation
 ) : IEventListener
 {
-  public List<MinecraftPacketTransformationMapping> RepeatForRange(ProtocolVersion startProtocolVersion, ProtocolVersion endProtocolVersion, Transformer transformer)
+  private static List<MinecraftPacketTransformationMapping> RepeatForRange(ProtocolVersion startProtocolVersion, ProtocolVersion endProtocolVersion, Transformer transformer)
   {
     var result = new List<MinecraftPacketTransformationMapping>();
     var range = ProtocolVersion.Range(startProtocolVersion, endProtocolVersion).ToArray();
@@ -109,6 +109,6 @@ internal class TransformationService(
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, clickContainerTransformation.UpgradeTo_1_21_2)
     ]);
 
-    logger.LogInformation($"Registered play transformations for {PlayerExtensions.get_Profile(playerContext.Player)?.Username ?? "unknown"}");
+    logger.LogInformation("Registered play transformations for {Player}", playerContext.Player.Profile?.Username ?? "unknown");
   }
 }
