@@ -10,6 +10,27 @@ jobs:
     with:
       release-please: false
 
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check plugin list consistency
+        run: |
+          set -euo pipefail
+          manifest_paths=$(jq -r '.plugins[].path' .github/plugin-manifest.json | sort)
+          rp_config_paths=$(jq -r '.packages | keys[]' .github/RELEASE_PLEASE/config.json | sort)
+          rp_manifest_paths=$(jq -r 'keys[]' .github/RELEASE_PLEASE/manifest.json | sort)
+          diff <(echo "$manifest_paths") <(echo "$rp_config_paths") \
+            || { echo "::error::plugin-manifest.json vs RELEASE_PLEASE/config.json drift"; exit 1; }
+          diff <(echo "$manifest_paths") <(echo "$rp_manifest_paths") \
+            || { echo "::error::plugin-manifest.json vs RELEASE_PLEASE/manifest.json drift"; exit 1; }
+          for tests in $(jq -r '.plugins[] | select(.tests != null) | .tests' .github/plugin-manifest.json); do
+            [ -d "$tests" ] || { echo "::error::test project $tests listed in plugin-manifest.json does not exist"; exit 1; }
+          done
+          echo "Plugin lists are consistent."
+
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -70,3 +91,21 @@ jobs:
     with:
       dotnet-version: ${{ needs.semver.outputs.dotnet-version }}
       release-info: ${{ needs.semver.outputs.release-info }}
+
+  # The one check to require in the ruleset: other jobs may be skipped or renamed with the plugin list
+  checks:
+    if: ${{ always() }}
+    needs: [semver, validate, changes, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          # Skipped jobs are fine, the test job is skipped when no tested plugin changed
+          if echo "$RESULTS" | jq -e 'any(.[]; .result == "failure" or .result == "cancelled")' > /dev/null; then
+            echo "::error::A required job failed or was cancelled"
+            exit 1
+          fi

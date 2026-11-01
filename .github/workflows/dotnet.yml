@@ -27,6 +27,7 @@ jobs:
           echo "matrix=$(jq -c '.plugins' .github/plugin-manifest.json)" >> "$GITHUB_OUTPUT"
 
   build:
+    name: build (${{ matrix.component }})
     needs: set-matrix
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
