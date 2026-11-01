@@ -11,9 +11,6 @@ namespace Menus.Protocol.Packets.Serverbound;
 public class SwingArmServerboundPacket : IMinecraftServerboundPacket<SwingArmServerboundPacket>
 {
   public const int MainHand = 0;
-  // Other animations of 1.7 clients don't swing a hand
-  public const int NoHand = -1;
-  private const int SwingAnimation = 1;
 
   // Until 26.3 replaced it with the punch packet
   public static readonly MinecraftPacketIdMapping[] Mappings = [
@@ -40,16 +37,11 @@ public class SwingArmServerboundPacket : IMinecraftServerboundPacket<SwingArmSer
 
   public static SwingArmServerboundPacket Decode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
-    // The off hand was added in 1.9
-    if (protocolVersion >= ProtocolVersion.MINECRAFT_1_9)
-      return new SwingArmServerboundPacket { Hand = buffer.ReadVarInt() };
-
-    // 1.8 removed the entity id and the animation that 1.7 clients send
-    if (protocolVersion >= ProtocolVersion.MINECRAFT_1_8)
-      return new SwingArmServerboundPacket { Hand = MainHand };
-
-    buffer.ReadInt();
-    return new SwingArmServerboundPacket { Hand = buffer.ReadUnsignedByte() == SwingAnimation ? MainHand : NoHand };
+    // Upgrade transformations bring older layouts to the 26.2 one, the last with this packet
+    return new SwingArmServerboundPacket
+    {
+      Hand = buffer.ReadVarInt()
+    };
   }
 
   public void Encode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)

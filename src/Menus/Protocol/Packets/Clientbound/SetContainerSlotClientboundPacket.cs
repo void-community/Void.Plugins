@@ -40,9 +40,10 @@ public class SetContainerSlotClientboundPacket : IMinecraftClientboundPacket<Set
   // No upgrade transformations are registered, so the container id keeps the backend layout.
   public static SetContainerSlotClientboundPacket Decode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
+    // Upgrade transformations bring older layouts to the latest one
     return new SetContainerSlotClientboundPacket
     {
-      ContainerId = protocolVersion >= ProtocolVersion.MINECRAFT_1_21_2 ? buffer.ReadVarInt() : (sbyte) buffer.ReadUnsignedByte()
+      ContainerId = buffer.ReadVarInt()
     };
   }
 

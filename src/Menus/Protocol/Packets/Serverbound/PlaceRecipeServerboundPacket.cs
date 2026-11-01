@@ -35,10 +35,10 @@ public class PlaceRecipeServerboundPacket : IMinecraftServerboundPacket<PlaceRec
 
   public static PlaceRecipeServerboundPacket Decode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
-    // No upgrade transformations are registered, so the container id keeps the client layout
+    // Upgrade transformations bring older layouts to the latest one
     return new PlaceRecipeServerboundPacket
     {
-      ContainerId = protocolVersion >= ProtocolVersion.MINECRAFT_1_21_2 ? buffer.ReadVarInt() : (sbyte) buffer.ReadUnsignedByte()
+      ContainerId = buffer.ReadVarInt()
     };
   }
 

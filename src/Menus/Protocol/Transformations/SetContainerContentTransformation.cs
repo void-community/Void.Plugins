@@ -134,4 +134,16 @@ public class SetContainerContentTransformation(ILogger<SetContainerContentTransf
 
     itemStackTransformation.Downgrade(wrapper, fromProtocolVersion, toProtocolVersion); // Carried item
   }
+
+  public void UpgradeTo_1_21_2(IMinecraftBinaryPacketWrapper wrapper,
+    ProtocolVersion fromProtocolVersion, ProtocolVersion toProtocolVersion)
+  {
+    logger.LogTrace("Upgrade to 1.21.2 {FromProtocolVersion} -> {ToProtocolVersion}", fromProtocolVersion, toProtocolVersion);
+
+    // Signed, the player inventory uses a negative id
+    var containerId = wrapper.Read<ByteProperty>();
+    wrapper.Write(VarIntProperty.FromPrimitive((sbyte)containerId.AsPrimitive));
+
+    wrapper.Passthrough<BinaryProperty>(); // State id, items and carried item
+  }
 }

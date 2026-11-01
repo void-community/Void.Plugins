@@ -10,9 +10,9 @@ namespace Menus.Protocol.Packets.Serverbound;
 // Only observed to cancel it, the original packet is forwarded as is
 public class PlayerActionServerboundPacket : IMinecraftServerboundPacket<PlayerActionServerboundPacket>
 {
-  public const int DropItemStackStatus = 3;
-  public const int DropItemStatus = 4;
-  public const int SwapItemInHandStatus = 6;
+  public const int DropItemStackStatus = 4;
+  public const int DropItemStatus = 5;
+  public const int SwapItemInHandStatus = 7;
 
   public static readonly MinecraftPacketIdMapping[] Mappings = [
     new(0x07, ProtocolVersion.MINECRAFT_1_7_2),
@@ -40,10 +40,10 @@ public class PlayerActionServerboundPacket : IMinecraftServerboundPacket<PlayerA
 
   public static PlayerActionServerboundPacket Decode(ref MinecraftBuffer buffer, ProtocolVersion protocolVersion)
   {
-    // No upgrade transformations are registered, so the status keeps the client layout
+    // Upgrade transformations bring older layouts to the latest one
     return new PlayerActionServerboundPacket
     {
-      Status = protocolVersion >= ProtocolVersion.MINECRAFT_1_9 ? buffer.ReadVarInt() : buffer.ReadUnsignedByte()
+      Status = buffer.ReadVarInt()
     };
   }
 

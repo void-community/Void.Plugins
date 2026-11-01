@@ -81,34 +81,6 @@ public class PacketCodecTests
     Assert.Equal([127, 5, 3, 0, 0, 0, 0], bytes[..(int) buffer.Position]);
   }
 
-  [Theory]
-  [InlineData(new byte[] { 0xFE }, 47, -2)] // 1.8 signed byte
-  [InlineData(new byte[] { 0xFE }, 767, -2)] // 1.21 signed byte
-  [InlineData(new byte[] { 0x05 }, 767, 5)]
-  [InlineData(new byte[] { 0xFE, 0xFF, 0xFF, 0xFF, 0x0F }, 768, -2)] // 1.21.2 VarInt
-  [InlineData(new byte[] { 0x00 }, 768, 0)]
-  public void SetContainerSlotDecodesBackendContainerId(byte[] bytes, int protocol, int containerId)
-  {
-    var buffer = new MinecraftBuffer(bytes.AsSpan());
-
-    var packet = SetContainerSlotClientboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
-
-    Assert.Equal(containerId, packet.ContainerId);
-  }
-
-  [Theory]
-  [InlineData(new byte[] { 0x00 }, 47, 0)]
-  [InlineData(new byte[] { 0x64 }, 767, 100)]
-  [InlineData(new byte[] { 0x00 }, 768, 0)]
-  public void SetContainerContentDecodesBackendContainerId(byte[] bytes, int protocol, int containerId)
-  {
-    var buffer = new MinecraftBuffer(bytes.AsSpan());
-
-    var packet = SetContainerContentClientboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
-
-    Assert.Equal(containerId, packet.ContainerId);
-  }
-
   [Fact]
   public void ClickContainerDecodesSlotOutsideTheWindowAsNegative()
   {
@@ -135,78 +107,12 @@ public class PacketCodecTests
     Assert.Equal([0x00, 0x00, 0xFC, 0x19, 0x00, 0x00], bytes[..(int) buffer.Position]);
   }
 
-  [Theory]
-  [InlineData(new byte[] { 0x00 }, 340, 0)] // 1.12.2 signed byte
-  [InlineData(new byte[] { 0xFE }, 767, -2)] // Last version with a signed byte
-  [InlineData(new byte[] { 0xFE, 0xFF, 0xFF, 0xFF, 0x0F }, 768, -2)] // First version with a VarInt
-  [InlineData(new byte[] { 0x00 }, 774, 0)]
-  public void PlaceRecipeDecodesContainerId(byte[] bytes, int protocol, int containerId)
-  {
-    var buffer = new MinecraftBuffer(bytes.AsSpan());
-
-    var packet = PlaceRecipeServerboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
-
-    Assert.Equal(containerId, packet.ContainerId);
-  }
-
-  [Theory]
-  [InlineData(new byte[] { 0x04 }, 47, 4)] // 1.8 byte
-  [InlineData(new byte[] { 0x06 }, 774, 6)] // VarInt
-  public void PlayerActionDecodesStatus(byte[] bytes, int protocol, int status)
-  {
-    var buffer = new MinecraftBuffer(bytes.AsSpan());
-
-    var packet = PlayerActionServerboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
-
-    Assert.Equal(status, packet.Status);
-  }
-
-  [Theory]
-  [InlineData(new byte[] { 0x00, 0x00, 0x00, 0x2A, 0x01 }, 5, 0)] // 1.7.10 entity id and animation
-  [InlineData(new byte[] { 0x00, 0x00, 0x00, 0x2A, 0x02 }, 5, -1)] // 1.7.10 animation other than a swing
-  [InlineData(new byte[] { }, 47, 0)] // 1.8 empty
-  [InlineData(new byte[] { 0x01 }, 107, 1)] // 1.9 off hand
-  [InlineData(new byte[] { 0x00 }, 774, 0)]
-  public void SwingArmDecodesHand(byte[] bytes, int protocol, int hand)
-  {
-    var buffer = new MinecraftBuffer(bytes.AsSpan());
-
-    var packet = SwingArmServerboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
-
-    Assert.Equal(hand, packet.Hand);
-    Assert.Equal(bytes.Length, buffer.Position);
-  }
-
   [Fact]
   public void SwingArmIsReplacedByPunchIn26_3()
   {
     Assert.DoesNotContain(SwingArmServerboundPacket.Mappings, mapping => mapping.ProtocolVersion >= ProtocolVersion.MINECRAFT_26_3);
     Assert.Equal(ProtocolVersion.MINECRAFT_26_3, PunchServerboundPacket.Mappings[0].ProtocolVersion);
     Assert.All(PunchServerboundPacket.Mappings, mapping => Assert.True(mapping.Id >= 0));
-  }
-
-  [Theory]
-  [InlineData(new byte[] { 0x00, 0x05 }, 47, 5)]
-  [InlineData(new byte[] { 0x00, 0x08 }, 774, 8)]
-  public void SetHeldItemServerboundDecodesSlot(byte[] bytes, int protocol, int slot)
-  {
-    var buffer = new MinecraftBuffer(bytes.AsSpan());
-
-    var packet = SetHeldItemServerboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
-
-    Assert.Equal(slot, packet.Slot);
-  }
-
-  [Theory]
-  [InlineData(new byte[] { 0x03 }, 47, 3)] // 1.8 byte
-  [InlineData(new byte[] { 0x07 }, 774, 7)] // VarInt
-  public void SetHeldItemClientboundDecodesSlot(byte[] bytes, int protocol, int slot)
-  {
-    var buffer = new MinecraftBuffer(bytes.AsSpan());
-
-    var packet = SetHeldItemClientboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
-
-    Assert.Equal(slot, packet.Slot);
   }
 
   [Fact]

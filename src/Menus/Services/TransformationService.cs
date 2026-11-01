@@ -22,7 +22,11 @@ internal class TransformationService(
   SetContainerPropertyTransformation setContainerPropertyTransformation,
   OpenContainerTransformation openContainerTransformation,
   CloseContainerTransformation closeContainerTransformation,
-  ClickContainerTransformation clickContainerTransformation
+  ClickContainerTransformation clickContainerTransformation,
+  PlaceRecipeTransformation placeRecipeTransformation,
+  PlayerActionTransformation playerActionTransformation,
+  SwingArmTransformation swingArmTransformation,
+  SetHeldItemTransformation setHeldItemTransformation
 ) : IEventListener
 {
   private static List<MinecraftPacketTransformationMapping> RepeatForRange(ProtocolVersion startProtocolVersion, ProtocolVersion endProtocolVersion, Transformer transformer)
@@ -67,6 +71,9 @@ internal class TransformationService(
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setContainerSlotTransformation.DowngradeTo_1_21),
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_4, ProtocolVersion.MINECRAFT_1_21_2, setContainerSlotTransformation.DowngradeTo_1_21_2),
       ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setContainerSlotTransformation.Passthrough_1_21_4_plus),
+
+      // Received from the backend
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, setContainerSlotTransformation.UpgradeTo_1_21_2)
     ]);
 
     playerContext.Player.RegisterTransformations<SetContainerContentClientboundPacket>(channel, [
@@ -78,10 +85,16 @@ internal class TransformationService(
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setContainerContentTransformation.DowngradeTo_1_21),
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_4, ProtocolVersion.MINECRAFT_1_21_2, setContainerContentTransformation.DowngradeTo_1_21_2),
       ..RepeatForRange(ProtocolVersion.Latest, ProtocolVersion.MINECRAFT_1_21_4, setContainerContentTransformation.Passthrough_1_21_4_plus),
+
+      // Received from the backend
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, setContainerContentTransformation.UpgradeTo_1_21_2)
     ]);
 
     playerContext.Player.RegisterTransformations<SetContainerPropertyClientboundPacket>(channel, [
-      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setContainerPropertyTransformation.DowngradeTo_1_21)
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21, setContainerPropertyTransformation.DowngradeTo_1_21),
+
+      // Received from the backend
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, setContainerPropertyTransformation.UpgradeTo_1_21_2)
     ]);
 
     playerContext.Player.RegisterTransformations<OpenContainerClientboundPacket>(channel, [
@@ -107,6 +120,24 @@ internal class TransformationService(
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_16_4, ProtocolVersion.MINECRAFT_1_17, clickContainerTransformation.UpgradeTo_1_17),
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_17, ProtocolVersion.MINECRAFT_1_17_1, clickContainerTransformation.UpgradeTo_1_17_1),
       ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, clickContainerTransformation.UpgradeTo_1_21_2)
+    ]);
+
+    playerContext.Player.RegisterTransformations<PlaceRecipeServerboundPacket>(channel, [
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21, ProtocolVersion.MINECRAFT_1_21_2, placeRecipeTransformation.UpgradeTo_1_21_2)
+    ]);
+
+    playerContext.Player.RegisterTransformations<PlayerActionServerboundPacket>(channel, [
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_8, ProtocolVersion.MINECRAFT_1_9, playerActionTransformation.UpgradeTo_1_9),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_26_2, ProtocolVersion.MINECRAFT_26_3, playerActionTransformation.UpgradeTo_26_3)
+    ]);
+
+    playerContext.Player.RegisterTransformations<SwingArmServerboundPacket>(channel, [
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_7_6, ProtocolVersion.MINECRAFT_1_8, swingArmTransformation.UpgradeTo_1_8),
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_8, ProtocolVersion.MINECRAFT_1_9, swingArmTransformation.UpgradeTo_1_9)
+    ]);
+
+    playerContext.Player.RegisterTransformations<SetHeldItemClientboundPacket>(channel, [
+      ..RepeatForRange(ProtocolVersion.MINECRAFT_1_21_2, ProtocolVersion.MINECRAFT_1_21_4, setHeldItemTransformation.UpgradeTo_1_21_4)
     ]);
 
     logger.LogInformation("Registered play transformations for {Player}", playerContext.Player.Profile?.Username ?? "unknown");
