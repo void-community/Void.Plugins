@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Menus.Api;
 using Menus.Events;
 using Menus.Minecraft;
@@ -68,6 +69,11 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
 
   // Clients echo it back in clicks, vanilla wraps it the same way
   private int stateId;
+
+  // Each backend resync sends the whole inventory and fires a click event on Paper, so clicking fast sends at most one per tick
+  private static readonly TimeSpan BackendResyncInterval = TimeSpan.FromMilliseconds(50);
+  private long lastBackendResyncTimestamp;
+  private int backendResyncScheduled;
 
   public Menu? InventoryMenu => ownedInventoryMenu ?? defaultInventoryMenu;
   private Menu? currentMenu;
@@ -338,8 +344,42 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     if (player.ProtocolVersion < ProtocolVersion.MINECRAFT_1_17_1)
       return;
 
-    if (!linkService.TryGetLink(player, out var link))
+    var elapsed = Stopwatch.GetElapsedTime(Interlocked.Read(ref lastBackendResyncTimestamp));
+
+    if (elapsed < BackendResyncInterval)
+    {
+      // The answer to the last resync may reach the client before this click's prediction, so send one more once the interval passed
+      if (Interlocked.Exchange(ref backendResyncScheduled, 1) == 0)
+        _ = SendDelayedBackendResyncAsync(BackendResyncInterval - elapsed);
+
       return;
+    }
+
+    await SendBackendResyncAsync(cancellationToken);
+  }
+
+  private async Task SendDelayedBackendResyncAsync(TimeSpan delay)
+  {
+    try
+    {
+      await Task.Delay(delay);
+      Interlocked.Exchange(ref backendResyncScheduled, 0);
+
+      // The player may have disconnected meanwhile, so the request's cancellation token is not used
+      await SendBackendResyncAsync(CancellationToken.None);
+    }
+    catch (Exception exception)
+    {
+      logger.LogDebug(exception, "Delayed backend inventory resync for {Player} failed", playerContext.Player.Profile?.Username ?? "unknown");
+    }
+  }
+
+  private async ValueTask SendBackendResyncAsync(CancellationToken cancellationToken)
+  {
+    if (!linkService.TryGetLink(playerContext.Player, out var link))
+      return;
+
+    Interlocked.Exchange(ref lastBackendResyncTimestamp, Stopwatch.GetTimestamp());
 
     // The proxy doesn't know the real player inventory, so ask the backend to resend it.
     // Clicking outside the inventory with an empty cursor changes nothing, and the stale state id
@@ -568,6 +608,11 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
         await HandleClickAsync(inventoryMenu, clickPacket, cancellationToken);
         return true;
 
+      // Picking moves real items into the hotbar, and the recipe book moves them into the crafting grid
+      case PickItemServerboundPacket:
+      case PickItemFromBlockServerboundPacket:
+      case PickItemFromEntityServerboundPacket:
+      case PlaceRecipeServerboundPacket { ContainerId: PlayerInventoryContainerId }:
       case SetCreativeModeSlotServerboundPacket:
       case PlayerActionServerboundPacket { Status: PlayerActionServerboundPacket.DropItemStackStatus or PlayerActionServerboundPacket.DropItemStatus or PlayerActionServerboundPacket.SwapItemInHandStatus }:
         @event.Cancel();
