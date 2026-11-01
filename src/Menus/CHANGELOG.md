@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/void-community/Void.Plugins/compare/Menus-v0.1.2...Menus-v0.1.3) (2026-11-01)
+
+
+### Bug Fixes
+
+* **menus:** upgrade received packets before decoding them ([#83](https://github.com/void-community/Void.Plugins/issues/83)) ([8f49c5c](https://github.com/void-community/Void.Plugins/commit/8f49c5c936d97174152debf47de1ac0d720d31e8))
+
 ## [0.1.2](https://github.com/void-community/Void.Plugins/compare/Menus-v0.1.1...Menus-v0.1.2) (2026-11-01)
 
 
