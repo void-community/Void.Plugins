@@ -160,4 +160,61 @@ public class PacketCodecTests
 
     Assert.Equal(status, packet.Status);
   }
+
+  [Theory]
+  [InlineData(new byte[] { 0x00, 0x00, 0x00, 0x2A, 0x01 }, 5, 0)] // 1.7.10 entity id and animation
+  [InlineData(new byte[] { 0x00, 0x00, 0x00, 0x2A, 0x02 }, 5, -1)] // 1.7.10 animation other than a swing
+  [InlineData(new byte[] { }, 47, 0)] // 1.8 empty
+  [InlineData(new byte[] { 0x01 }, 107, 1)] // 1.9 off hand
+  [InlineData(new byte[] { 0x00 }, 774, 0)]
+  public void SwingArmDecodesHand(byte[] bytes, int protocol, int hand)
+  {
+    var buffer = new MinecraftBuffer(bytes.AsSpan());
+
+    var packet = SwingArmServerboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
+
+    Assert.Equal(hand, packet.Hand);
+    Assert.Equal(bytes.Length, buffer.Position);
+  }
+
+  [Fact]
+  public void SwingArmIsReplacedByPunchIn26_3()
+  {
+    Assert.DoesNotContain(SwingArmServerboundPacket.Mappings, mapping => mapping.ProtocolVersion >= ProtocolVersion.MINECRAFT_26_3);
+    Assert.Equal(ProtocolVersion.MINECRAFT_26_3, PunchServerboundPacket.Mappings[0].ProtocolVersion);
+    Assert.All(PunchServerboundPacket.Mappings, mapping => Assert.True(mapping.Id >= 0));
+  }
+
+  [Theory]
+  [InlineData(new byte[] { 0x00, 0x05 }, 47, 5)]
+  [InlineData(new byte[] { 0x00, 0x08 }, 774, 8)]
+  public void SetHeldItemServerboundDecodesSlot(byte[] bytes, int protocol, int slot)
+  {
+    var buffer = new MinecraftBuffer(bytes.AsSpan());
+
+    var packet = SetHeldItemServerboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
+
+    Assert.Equal(slot, packet.Slot);
+  }
+
+  [Theory]
+  [InlineData(new byte[] { 0x03 }, 47, 3)] // 1.8 byte
+  [InlineData(new byte[] { 0x07 }, 774, 7)] // VarInt
+  public void SetHeldItemClientboundDecodesSlot(byte[] bytes, int protocol, int slot)
+  {
+    var buffer = new MinecraftBuffer(bytes.AsSpan());
+
+    var packet = SetHeldItemClientboundPacket.Decode(ref buffer, ProtocolVersion.Get(protocol));
+
+    Assert.Equal(slot, packet.Slot);
+  }
+
+  [Fact]
+  public void HeldSlotAndSwingMappingsResolveForEveryVersion()
+  {
+    // Registry lookups return -1 for versions without the packet
+    Assert.All(SwingArmServerboundPacket.Mappings, mapping => Assert.True(mapping.Id >= 0));
+    Assert.All(SetHeldItemServerboundPacket.Mappings, mapping => Assert.True(mapping.Id >= 0));
+    Assert.All(SetHeldItemClientboundPacket.Mappings, mapping => Assert.True(mapping.Id >= 0));
+  }
 }

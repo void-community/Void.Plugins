@@ -33,6 +33,8 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   private const int PlayerInventoryDirectContainerId = -2;
   private const int CursorSlot = -1;
   private const int OutsideSlot = -999;
+  // The hotbar follows the main inventory in the player inventory window
+  private const int MainInventorySize = 27;
 
   // Container sizes the client expects, for types whose size doesn't change between versions
   private static readonly Dictionary<Identifier, int> KnownMenuSizes = new()
@@ -70,6 +72,14 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   // Clients echo it back in clicks, vanilla wraps it the same way
   private int stateId;
 
+  // The selected hotbar slot from 0 to 8, set by the player and by the backend
+  private int heldSlot;
+
+  // Before 26.3 clients also swing right after using or dropping the held item, in the same tick.
+  // The window leaves room for handling the packet sent before the swing.
+  private static readonly TimeSpan SwingAfterActionWindow = TimeSpan.FromMilliseconds(100);
+  private long lastSwingingActionTimestamp;
+
   // Each backend resync sends the whole inventory and fires a click event on Paper, so clicking fast sends at most one per tick
   private static readonly TimeSpan BackendResyncInterval = TimeSpan.FromMilliseconds(50);
   private long lastBackendResyncTimestamp;
@@ -86,7 +96,8 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
   /// <summary>
   /// Shows <paramref name="menu"/> as the player inventory. While it is set, the proxy owns the player inventory:
   /// backend inventory updates and the player's own inventory changes are blocked, and the menu is shown again after
-  /// backend containers close. Pass <c>null</c> to hand the inventory back to the backend.
+  /// backend containers close. Left clicking in the world clicks the held hotbar item with <see cref="ClickType.LeftMouseButton"/>.
+  /// Pass <c>null</c> to hand the inventory back to the backend.
   /// Can be called before the player joins a server, for example on <c>PlayerJoinedServerEvent</c>: the menu is then
   /// shown once the backend sends the player inventory.
   /// </summary>
@@ -540,6 +551,7 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
     // Joining a server starts with a fresh client inventory and no screens open
     inventoryInitialized = false;
     backendContainerOpen = false;
+    heldSlot = 0;
     await ClearCurrentMenuAsync(cancellationToken);
   }
 
@@ -566,6 +578,17 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
       case CloseContainerServerboundPacket { ContainerId: not (PlayerInventoryContainerId or MenuContainerId) }:
       case CloseContainerClientboundPacket:
         backendContainerOpen = false;
+        break;
+      case SetHeldItemServerboundPacket { Slot: >= 0 and <= 8 } setHeldItemPacket:
+        heldSlot = setHeldItemPacket.Slot;
+        break;
+      case SetHeldItemClientboundPacket { Slot: >= 0 and <= 8 } setHeldItemPacket:
+        heldSlot = setHeldItemPacket.Slot;
+        break;
+      case UseItemOnServerboundPacket:
+      case UseItemServerboundPacket:
+      case PlayerActionServerboundPacket { Status: PlayerActionServerboundPacket.DropItemStackStatus or PlayerActionServerboundPacket.DropItemStatus }:
+        Interlocked.Exchange(ref lastSwingingActionTimestamp, Stopwatch.GetTimestamp());
         break;
     }
 
@@ -664,9 +687,34 @@ public class MenuService(ILogger<MenuService> logger, IPlayerContext playerConte
         await RestoreInventoryMenuAsync(inventoryMenu, cancellationToken);
         return true;
 
+      // Left clicking swings the main hand, 26.3 replaced the swing with a punch
+      case SwingArmServerboundPacket { Hand: SwingArmServerboundPacket.MainHand }:
+      case PunchServerboundPacket:
+        await ClickHeldItemAsync(@event, inventoryMenu, cancellationToken);
+        return true;
+
       default:
         return false;
     }
+  }
+
+  private async ValueTask ClickHeldItemAsync(MessageReceivedEvent @event, Menu inventoryMenu, CancellationToken cancellationToken)
+  {
+    // Clients don't swing while a screen is open
+    if (currentMenu is not null || backendContainerOpen)
+      return;
+
+    // Not a left click, the swing belongs to the use or drop sent right before it
+    if (@event.Message is SwingArmServerboundPacket && Stopwatch.GetElapsedTime(Interlocked.Read(ref lastSwingingActionTimestamp)) < SwingAfterActionWindow)
+      return;
+
+    var slot = inventoryMenu.Size + MainInventorySize + heldSlot;
+    if (!inventoryMenu.ItemsMap.ContainsKey(slot))
+      return;
+
+    // The click belongs to the menu item, which the backend never saw in the player's hand
+    @event.Cancel();
+    await ClickSlotAsync(inventoryMenu, slot, ClickType.LeftMouseButton, cancellationToken);
   }
 
   [Obsolete($"The default inventory menu is shown in menus but doesn't own the player inventory, use {nameof(SetInventoryMenuAsync)} per player instead.")]
