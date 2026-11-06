@@ -6,6 +6,8 @@
         <Nullable>enable</Nullable>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
+        <!-- xunit.v3 4.x defaults to Microsoft.Testing.Platform, which the .NET 10 SDK rejects under VSTest; keep running through xunit.runner.visualstudio -->
+        <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     </PropertyGroup>
 
     <ItemGroup>
